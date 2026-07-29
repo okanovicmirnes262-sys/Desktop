@@ -113,11 +113,13 @@ email).
    Environment Variables. Set `NEXT_PUBLIC_APP_URL` to your production
    URL.
 3. `vercel.json` schedules the reminder cron (`/api/reminders/dispatch`)
-   every 5 minutes. Vercel sends `Authorization: Bearer $CRON_SECRET`
-   automatically when `CRON_SECRET` is set.
-   *Note:* the Hobby plan limits cron frequency — either upgrade, or point
-   any external cron (e.g. cron-job.org) at the endpoint with the same
-   Bearer header.
+   once a day — the maximum the Hobby plan allows (more frequent crons
+   make Hobby deploys fail). Vercel sends `Authorization: Bearer
+   $CRON_SECRET` automatically when `CRON_SECRET` is set.
+   For on-time reminders, point an external cron (e.g. the free
+   cron-job.org) at the endpoint every 5 minutes with the same Bearer
+   header — or upgrade to Vercel Pro and set the schedule back to
+   `*/5 * * * *`.
 4. In Supabase → Authentication → URL Configuration, set the Site URL to
    your production URL and add `https://<your-domain>/auth/callback` to
    the redirect list.
