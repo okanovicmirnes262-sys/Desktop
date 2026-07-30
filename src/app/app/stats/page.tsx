@@ -25,23 +25,26 @@ export default async function StatsPage() {
   const fullStats = canUseFeature('full_stats', sub);
   const since = addDays(today, -120); // enough history for the heatmap
 
-  const rows = await Promise.all(
-    routines.map(async (routine) => {
-      const [stored, completions, restDayList] = await Promise.all([
-        db.getStreak(supabase, routine.id),
-        db.listCompletions(supabase, routine.id, since),
-        db.listRestDays(supabase, routine.id, since),
-      ]);
-      const restDays = new Set(restDayList);
-      const streak = stored ? reconcile(stored, today, restDays).state : null;
-      return {
-        routine,
-        streak,
-        rate: completionRate(routine, completions, today, 30, restDays),
-        heatmap: heatmapData(routine, completions, today, 15, restDays),
-      };
-    }),
-  );
+  // Bulk queries: 3 round trips total instead of 3 per routine.
+  const ids = routines.map((r) => r.id);
+  const [streaksMap, completionsMap, restMap] = await Promise.all([
+    db.getStreaksBulk(supabase, ids),
+    db.listCompletionsBulk(supabase, ids, since),
+    db.listRestDaysBulk(supabase, ids, since),
+  ]);
+
+  const rows = routines.map((routine) => {
+    const stored = streaksMap.get(routine.id) ?? null;
+    const completions = completionsMap.get(routine.id) ?? [];
+    const restDays = restMap.get(routine.id) ?? new Set<string>();
+    const streak = stored ? reconcile(stored, today, restDays).state : null;
+    return {
+      routine,
+      streak,
+      rate: completionRate(routine, completions, today, 30, restDays),
+      heatmap: heatmapData(routine, completions, today, 15, restDays),
+    };
+  });
 
   return (
     <main className="flex flex-col gap-5">

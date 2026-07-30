@@ -309,6 +309,55 @@ export async function listCompletions(
   }));
 }
 
+// ---- bulk reads (one round trip for N routines — keeps pages fast) -------
+
+export async function getStreaksBulk(
+  db: Db,
+  routineIds: string[],
+): Promise<Map<string, StreakState>> {
+  if (routineIds.length === 0) return new Map();
+  const { data, error } = await db.from('streaks').select('*').in('routine_id', routineIds);
+  fail(error);
+  return new Map(data.map((s: any) => [s.routine_id as string, mapStreak(s)]));
+}
+
+export async function listCompletionsBulk(
+  db: Db,
+  routineIds: string[],
+  sinceDate: string,
+): Promise<Map<string, Completion[]>> {
+  const map = new Map<string, Completion[]>(routineIds.map((id) => [id, []]));
+  if (routineIds.length === 0) return map;
+  const { data, error } = await db
+    .from('completions')
+    .select('id, routine_id, completed_on')
+    .in('routine_id', routineIds)
+    .gte('completed_on', sinceDate)
+    .order('completed_on');
+  fail(error);
+  for (const c of data) {
+    map.get(c.routine_id)?.push({ id: c.id, routineId: c.routine_id, completedOn: c.completed_on });
+  }
+  return map;
+}
+
+export async function listRestDaysBulk(
+  db: Db,
+  routineIds: string[],
+  sinceDate: string,
+): Promise<Map<string, Set<string>>> {
+  const map = new Map<string, Set<string>>(routineIds.map((id) => [id, new Set()]));
+  if (routineIds.length === 0) return map;
+  const { data, error } = await db
+    .from('rest_days')
+    .select('routine_id, on_date')
+    .in('routine_id', routineIds)
+    .gte('on_date', sinceDate);
+  fail(error);
+  for (const r of data) map.get(r.routine_id)?.add(r.on_date);
+  return map;
+}
+
 // ---- rest days & run progress --------------------------------------------
 
 export async function listRestDays(db: Db, routineId: string, since: string): Promise<string[]> {

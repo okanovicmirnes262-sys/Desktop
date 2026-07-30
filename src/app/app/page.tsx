@@ -32,26 +32,29 @@ export default async function TodayPage() {
   const today = todayInTz(profile.timezone);
   const weekStart = addDays(today, -weekdayOf(today)); // Sunday of this week
 
-  const cards = await Promise.all(
-    routines.map(async (routine) => {
-      const [stored, weekCompletions, restDayList] = await Promise.all([
-        db.getStreak(supabase, routine.id),
-        db.listCompletions(supabase, routine.id, weekStart),
-        db.listRestDays(supabase, routine.id, addDays(today, -45)),
-      ]);
-      const restDays = new Set(restDayList);
-      // Display-time reconcile (pure): freeze spends persist on next completion.
-      const streak = stored ? reconcile(stored, today, restDays).state : null;
-      return {
-        routine,
-        streak,
-        weekCompletions,
-        doneToday: weekCompletions.some((c) => c.completedOn === today),
-        restToday: restDays.has(today),
-        restDays,
-      };
-    }),
-  );
+  // Three bulk queries regardless of routine count — page stays fast.
+  const ids = routines.map((r) => r.id);
+  const [streaksMap, completionsMap, restMap] = await Promise.all([
+    db.getStreaksBulk(supabase, ids),
+    db.listCompletionsBulk(supabase, ids, weekStart),
+    db.listRestDaysBulk(supabase, ids, addDays(today, -45)),
+  ]);
+
+  const cards = routines.map((routine) => {
+    const stored = streaksMap.get(routine.id) ?? null;
+    const weekCompletions = completionsMap.get(routine.id) ?? [];
+    const restDays = restMap.get(routine.id) ?? new Set<string>();
+    // Display-time reconcile (pure): freeze spends persist on next completion.
+    const streak = stored ? reconcile(stored, today, restDays).state : null;
+    return {
+      routine,
+      streak,
+      weekCompletions,
+      doneToday: weekCompletions.some((c) => c.completedOn === today),
+      restToday: restDays.has(today),
+      restDays,
+    };
+  });
 
   // Weekly summary: scheduled slots so far this week vs completed, across
   // all routines. Rest days don't count against.

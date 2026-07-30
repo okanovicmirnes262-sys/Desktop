@@ -22,9 +22,11 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifies the JWT locally (no network round trip on projects
+  // with asymmetric signing keys) — much faster than getUser on every
+  // navigation, and it still refreshes an expired session cookie.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const path = request.nextUrl.pathname;
   if (!user && path.startsWith('/app')) {
