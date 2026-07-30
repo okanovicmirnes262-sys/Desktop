@@ -27,7 +27,7 @@ export function DeleteRoutineButton({ routineId, name }: { routineId: string; na
         <button
           disabled={pending}
           onClick={() => startTransition(() => deleteRoutineAction(routineId))}
-          className="flex-1 rounded-full bg-ink px-6 py-3 font-semibold text-white disabled:opacity-50"
+          className="flex-1 rounded-full bg-ink px-6 py-3 font-semibold text-on-ink disabled:opacity-50"
         >
           Yes, delete
         </button>

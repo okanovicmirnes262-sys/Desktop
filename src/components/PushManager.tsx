@@ -89,7 +89,7 @@ export function PushManager() {
       onClick={state === 'on' ? disable : enable}
       disabled={state === 'busy'}
       className={`w-full rounded-full px-6 py-4 text-lg font-semibold transition-transform active:scale-95 disabled:opacity-50 ${
-        state === 'on' ? 'bg-mint' : 'bg-ink text-white'
+        state === 'on' ? 'bg-mint' : 'bg-ink text-on-ink'
       }`}
     >
       {state === 'busy'

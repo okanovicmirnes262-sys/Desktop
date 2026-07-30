@@ -47,6 +47,15 @@ export async function GET(request: Request) {
       .maybeSingle();
     if (done) continue;
 
+    // Skip declared rest days — resting means not being nagged.
+    const { data: resting } = await db
+      .from('rest_days')
+      .select('on_date')
+      .eq('routine_id', r.id)
+      .eq('on_date', today)
+      .maybeSingle();
+    if (resting) continue;
+
     // Dedupe: primary key (routine_id, on_date) makes double-sends impossible
     // even with overlapping cron runs.
     const { error: dupe } = await db

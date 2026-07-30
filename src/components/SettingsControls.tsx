@@ -2,8 +2,43 @@
 
 // Small client controls used on the Settings page.
 
-import { useTransition } from 'react';
+import { useSyncExternalStore, useTransition } from 'react';
 import { updateThemeAction, updateTimezoneAction } from '@/lib/actions';
+import { SOUND_PREF_KEY } from '@/components/RunPlayer';
+
+// Tiny external store around localStorage so the toggle reads/writes the
+// device preference without effect-driven state (and stays SSR-safe).
+const soundListeners = new Set<() => void>();
+const soundStore = {
+  subscribe(cb: () => void) {
+    soundListeners.add(cb);
+    return () => soundListeners.delete(cb);
+  },
+  get: () => localStorage.getItem(SOUND_PREF_KEY) !== 'off',
+  getServer: () => true,
+  set(on: boolean) {
+    localStorage.setItem(SOUND_PREF_KEY, on ? 'on' : 'off');
+    soundListeners.forEach((cb) => cb());
+  },
+};
+
+/** Celebration sound on/off — a device preference, stored locally. */
+export function SoundToggle() {
+  const on = useSyncExternalStore(soundStore.subscribe, soundStore.get, soundStore.getServer);
+
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={() => soundStore.set(!on)}
+      className={`w-full rounded-full px-6 py-4 text-lg font-semibold transition-transform active:scale-95 ${
+        on ? 'bg-mint' : 'bg-paper text-ink-soft'
+      }`}
+    >
+      {on ? 'Celebration sound on 🔔 (tap to mute)' : 'Celebration sound off 🔕'}
+    </button>
+  );
+}
 
 export function TimezoneSync({ current }: { current: string }) {
   const [pending, startTransition] = useTransition();

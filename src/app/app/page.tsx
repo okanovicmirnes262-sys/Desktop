@@ -1,10 +1,19 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
-import { todayInTz } from '@/core/dates';
+import { addDays, todayInTz, weekdayOf } from '@/core/dates';
 import { reconcile } from '@/core/streak';
 import { canCreateRoutine } from '@/core/entitlements';
 import { seedExampleRoutinesAction, skipOnboardingAction } from '@/lib/actions';
+import { RestDayButton } from '@/components/RestDayButton';
+
+const COLOR_CLASSES: Record<string, string> = {
+  sky: 'bg-sky',
+  mint: 'bg-mint',
+  blush: 'bg-blush',
+  butter: 'bg-butter',
+};
+const ROTATION = ['bg-sky', 'bg-mint', 'bg-blush', 'bg-butter'];
 
 // Today: the one screen that matters. Each routine is a big card with a
 // single primary action — Start.
@@ -21,18 +30,43 @@ export default async function TodayPage() {
     db.getSubscription(supabase, user.id),
   ]);
   const today = todayInTz(profile.timezone);
+  const weekStart = addDays(today, -weekdayOf(today)); // Sunday of this week
 
   const cards = await Promise.all(
     routines.map(async (routine) => {
-      const [stored, completions] = await Promise.all([
+      const [stored, weekCompletions, restDayList] = await Promise.all([
         db.getStreak(supabase, routine.id),
-        db.listCompletions(supabase, routine.id, today),
+        db.listCompletions(supabase, routine.id, weekStart),
+        db.listRestDays(supabase, routine.id, addDays(today, -45)),
       ]);
+      const restDays = new Set(restDayList);
       // Display-time reconcile (pure): freeze spends persist on next completion.
-      const streak = stored ? reconcile(stored, today).state : null;
-      return { routine, streak, doneToday: completions.length > 0 };
+      const streak = stored ? reconcile(stored, today, restDays).state : null;
+      return {
+        routine,
+        streak,
+        weekCompletions,
+        doneToday: weekCompletions.some((c) => c.completedOn === today),
+        restToday: restDays.has(today),
+        restDays,
+      };
     }),
   );
+
+  // Weekly summary: scheduled slots so far this week vs completed, across
+  // all routines. Rest days don't count against.
+  let weekScheduled = 0;
+  let weekDone = 0;
+  for (const { routine, weekCompletions, restDays } of cards) {
+    const done = new Set(weekCompletions.map((c) => c.completedOn));
+    for (let d = weekStart; ; d = addDays(d, 1)) {
+      if (routine.scheduleDays.includes(weekdayOf(d)) && !restDays.has(d)) {
+        weekScheduled += 1;
+        if (done.has(d)) weekDone += 1;
+      }
+      if (d === today) break;
+    }
+  }
 
   const hour = Number(
     new Intl.DateTimeFormat('en-GB', {
@@ -51,7 +85,11 @@ export default async function TodayPage() {
           {greeting}
           {profile.displayName ? `, ${profile.displayName}` : ''} <span aria-hidden>👋</span>
         </h1>
-        <p className="mt-1 text-ink-soft">One tiny step at a time.</p>
+        <p className="mt-1 text-ink-soft">
+          {weekScheduled > 0
+            ? `This week: ${weekDone} of ${weekScheduled} done.`
+            : 'One tiny step at a time.'}
+        </p>
       </header>
 
       {!profile.onboarded && (
@@ -63,7 +101,7 @@ export default async function TodayPage() {
           </p>
           <div className="mt-5 flex flex-col gap-3">
             <form action={seedExampleRoutinesAction}>
-              <button className="w-full rounded-full bg-ink px-6 py-4 text-lg font-semibold text-white transition-transform active:scale-95">
+              <button className="w-full rounded-full bg-ink px-6 py-4 text-lg font-semibold text-on-ink transition-transform active:scale-95">
                 Yes, add them
               </button>
             </form>
@@ -76,10 +114,12 @@ export default async function TodayPage() {
         </div>
       )}
 
-      {cards.map(({ routine, streak, doneToday }, i) => {
-        const pastel = ['bg-sky', 'bg-mint', 'bg-blush', 'bg-butter'][i % 4];
+      {cards.map(({ routine, streak, doneToday, restToday }, i) => {
+        const pastel =
+          (routine.color && COLOR_CLASSES[routine.color]) ?? ROTATION[i % ROTATION.length];
+        const settled = doneToday || restToday;
         return (
-          <div key={routine.id} className={`rounded-card ${doneToday ? 'bg-card' : pastel} p-6`}>
+          <div key={routine.id} className={`rounded-card ${settled ? 'bg-card' : pastel} p-6`}>
             <div className="flex items-start justify-between gap-3">
               <Link href={`/app/routines/${routine.id}`} className="min-w-0">
                 <p className="text-3xl" aria-hidden>
@@ -89,7 +129,7 @@ export default async function TodayPage() {
               </Link>
               <div className="flex shrink-0 flex-col items-end gap-1 text-sm font-medium">
                 {streak && streak.currentStreak > 0 && (
-                  <span className="rounded-full bg-ink px-3 py-1 text-white">
+                  <span className="rounded-full bg-ink px-3 py-1 text-on-ink">
                     🔥 {streak.currentStreak} day{streak.currentStreak === 1 ? '' : 's'}
                   </span>
                 )}
@@ -108,13 +148,20 @@ export default async function TodayPage() {
               <p className="mt-4 rounded-full bg-mint px-6 py-4 text-center text-lg font-semibold">
                 Done today ✓
               </p>
+            ) : restToday ? (
+              <p className="mt-4 rounded-full bg-butter px-6 py-4 text-center text-lg font-semibold">
+                Resting today ☕ — streak is safe
+              </p>
             ) : (
-              <Link
-                href={`/app/routines/${routine.id}/run`}
-                className="mt-4 block rounded-full bg-ink px-6 py-4 text-center text-lg font-semibold text-white transition-transform active:scale-95"
-              >
-                Start
-              </Link>
+              <>
+                <Link
+                  href={`/app/routines/${routine.id}/run`}
+                  className="mt-4 block rounded-full bg-ink px-6 py-4 text-center text-lg font-semibold text-on-ink transition-transform active:scale-95"
+                >
+                  Start
+                </Link>
+                <RestDayButton routineId={routine.id} />
+              </>
             )}
           </div>
         );

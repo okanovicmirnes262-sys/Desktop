@@ -4,12 +4,12 @@ import Link from "next/link";
 export default function LandingPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-12">
-      <div className="rounded-card bg-ink p-8 text-white">
+      <div className="rounded-card bg-ink p-8 text-on-ink">
         <p className="text-5xl" aria-hidden>
           ☺
         </p>
         <h1 className="mt-6 text-4xl font-semibold tracking-tight">TinySteps</h1>
-        <p className="mt-3 text-lg leading-relaxed text-white/80">
+        <p className="mt-3 text-lg leading-relaxed text-on-ink/80">
           Routines in tiny steps. One thing at a time. Streaks that forgive a
           bad day.
         </p>
@@ -28,7 +28,7 @@ export default function LandingPage() {
 
       <Link
         href="/login"
-        className="mt-2 block rounded-full bg-ink px-8 py-5 text-center text-lg font-semibold text-white transition-transform active:scale-95"
+        className="mt-2 block rounded-full bg-ink px-8 py-5 text-center text-lg font-semibold text-on-ink transition-transform active:scale-95"
       >
         Get started
       </Link>

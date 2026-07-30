@@ -27,16 +27,18 @@ export default async function StatsPage() {
 
   const rows = await Promise.all(
     routines.map(async (routine) => {
-      const [stored, completions] = await Promise.all([
+      const [stored, completions, restDayList] = await Promise.all([
         db.getStreak(supabase, routine.id),
         db.listCompletions(supabase, routine.id, since),
+        db.listRestDays(supabase, routine.id, since),
       ]);
-      const streak = stored ? reconcile(stored, today).state : null;
+      const restDays = new Set(restDayList);
+      const streak = stored ? reconcile(stored, today, restDays).state : null;
       return {
         routine,
         streak,
-        rate: completionRate(routine, completions, today),
-        heatmap: heatmapData(routine, completions, today),
+        rate: completionRate(routine, completions, today, 30, restDays),
+        heatmap: heatmapData(routine, completions, today, 15, restDays),
       };
     }),
   );

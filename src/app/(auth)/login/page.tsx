@@ -118,7 +118,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full bg-ink px-8 py-5 text-lg font-semibold text-white transition-transform active:scale-95 disabled:opacity-50"
+          className="rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95 disabled:opacity-50"
         >
           {busy ? 'One sec…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
         </button>

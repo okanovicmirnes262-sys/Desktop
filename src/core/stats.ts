@@ -10,6 +10,7 @@ export function completionRate(
   completions: Completion[],
   today: LocalDate,
   windowDays = 30,
+  restDays?: ReadonlySet<LocalDate>,
 ): number | null {
   const done = new Set(completions.map((c) => c.completedOn));
   let scheduled = 0;
@@ -17,6 +18,7 @@ export function completionRate(
   for (let i = 0; i < windowDays; i++) {
     const day = addDays(today, -i);
     if (!routine.scheduleDays.includes(weekdayOf(day))) continue;
+    if (restDays?.has(day) && !done.has(day)) continue; // rest days don't count against
     scheduled += 1;
     if (done.has(day)) completed += 1;
   }
@@ -37,6 +39,7 @@ export function heatmapData(
   completions: Completion[],
   today: LocalDate,
   weeks = 15,
+  restDays?: ReadonlySet<LocalDate>,
 ): HeatmapCell[][] {
   const done = new Set(completions.map((c) => c.completedOn));
   // End the grid on the Saturday of the current week.
@@ -48,7 +51,8 @@ export function heatmapData(
     for (let d = 0; d < 7; d++) {
       const date = addDays(start, w * 7 + d);
       const inFuture = daysBetween(today, date) > 0;
-      const scheduled = routine.scheduleDays.includes(weekdayOf(date));
+      const scheduled =
+        routine.scheduleDays.includes(weekdayOf(date)) && !restDays?.has(date);
       const level: HeatmapCell['level'] = done.has(date) ? 2 : scheduled ? 1 : 0;
       col.push({ date, level: inFuture ? (scheduled ? 1 : 0) : level, inFuture });
     }

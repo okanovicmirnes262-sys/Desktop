@@ -116,7 +116,7 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
         />
         <button
           disabled={pending || !newTitle.trim()}
-          className="h-11 shrink-0 rounded-full bg-ink px-5 font-semibold text-white disabled:opacity-40"
+          className="h-11 shrink-0 rounded-full bg-ink px-5 font-semibold text-on-ink disabled:opacity-40"
         >
           Add
         </button>

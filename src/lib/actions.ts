@@ -8,7 +8,12 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import * as db from '@/lib/db';
-import { applyCompletion, initialStreakState, reconcile } from '@/core/streak';
+import {
+  applyCompletion,
+  initialStreakState,
+  reconcile,
+  REST_DAYS_PER_MONTH,
+} from '@/core/streak';
 import { todayInTz } from '@/core/dates';
 import { canCreateRoutine } from '@/core/entitlements';
 import { getPaymentProvider } from '@/core/payments';
@@ -29,6 +34,7 @@ async function requireUser() {
 export async function createRoutineAction(input: {
   name: string;
   emoji: string;
+  color: 'sky' | 'mint' | 'blush' | 'butter' | null;
   scheduleDays: number[];
   reminderTime: string | null;
   timerSeconds: number | null;
@@ -54,6 +60,7 @@ export async function updateRoutineAction(
   patch: {
     name?: string;
     emoji?: string;
+    color?: 'sky' | 'mint' | 'blush' | 'butter' | null;
     scheduleDays?: number[];
     reminderTime?: string | null;
     timerSeconds?: number | null;
@@ -123,11 +130,15 @@ export async function completeRoutineAction(routineId: string): Promise<Completi
   const today = todayInTz(profile.timezone);
 
   const stored = (await db.getStreak(supabase, routineId)) ?? initialStreakState(routineId);
-  const { state, events } = applyCompletion(stored, today);
+  const restDays = new Set(
+    await db.listRestDays(supabase, routineId, stored.lastCompletedOn ?? today),
+  );
+  const { state, events } = applyCompletion(stored, today, restDays);
 
   await db.insertCompletion(supabase, user.id, routineId, today);
   await db.saveStreak(supabase, user.id, state);
   await db.insertFreezeEvents(supabase, user.id, routineId, events);
+  await db.clearRunProgress(supabase, routineId);
 
   revalidatePath('/app');
   revalidatePath('/app/stats');
@@ -148,12 +159,44 @@ export async function reconcileStreaksAction() {
   for (const routine of routines) {
     const stored = await db.getStreak(supabase, routine.id);
     if (!stored) continue;
-    const { state, events } = reconcile(stored, today);
+    const restDays = new Set(
+      await db.listRestDays(supabase, routine.id, stored.lastCompletedOn ?? today),
+    );
+    const { state, events } = reconcile(stored, today, restDays);
     if (events.length > 0 || state.currentStreak !== stored.currentStreak) {
       await db.saveStreak(supabase, user.id, state);
       await db.insertFreezeEvents(supabase, user.id, routine.id, events);
     }
   }
+}
+
+// ---- rest days & run progress --------------------------------------------
+
+/** "Taking today off": protects the streak without spending a freeze. */
+export async function takeRestDayAction(
+  routineId: string,
+): Promise<{ ok: true } | { ok: false; error: 'limit' | 'already_done' }> {
+  const { supabase, user } = await requireUser();
+  const profile = await db.getProfile(supabase, user.id);
+  const today = todayInTz(profile.timezone);
+
+  const doneToday = await db.listCompletions(supabase, routineId, today);
+  if (doneToday.length > 0) return { ok: false, error: 'already_done' };
+
+  const used = await db.countRestDaysInMonth(supabase, routineId, today);
+  if (used >= REST_DAYS_PER_MONTH) return { ok: false, error: 'limit' };
+
+  await db.addRestDay(supabase, user.id, routineId, today);
+  revalidatePath('/app');
+  return { ok: true };
+}
+
+/** Persist where the user is in today's run so it survives reloads. */
+export async function saveRunProgressAction(routineId: string, stepIndex: number) {
+  const { supabase, user } = await requireUser();
+  const profile = await db.getProfile(supabase, user.id);
+  const today = todayInTz(profile.timezone);
+  await db.saveRunProgress(supabase, user.id, routineId, today, stepIndex);
 }
 
 // ---- onboarding seed ------------------------------------------------------

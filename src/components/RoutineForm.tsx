@@ -10,11 +10,20 @@ import { createRoutineAction, updateRoutineAction } from '@/lib/actions';
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const EMOJI_CHOICES = ['🌅', '🌙', '💪', '🧹', '📚', '💊', '🧘', '✨'];
+const COLOR_CHOICES = [
+  { key: null, label: 'Auto', swatch: 'linear-gradient(135deg, var(--sky), var(--blush))' },
+  { key: 'sky', label: 'Sky', swatch: 'var(--sky)' },
+  { key: 'mint', label: 'Mint', swatch: 'var(--mint)' },
+  { key: 'blush', label: 'Blush', swatch: 'var(--blush)' },
+  { key: 'butter', label: 'Butter', swatch: 'var(--butter)' },
+] as const;
+type ColorKey = (typeof COLOR_CHOICES)[number]['key'];
 
 export function RoutineForm({ routine }: { routine?: Routine }) {
   const router = useRouter();
   const [name, setName] = useState(routine?.name ?? '');
   const [emoji, setEmoji] = useState(routine?.emoji ?? '✨');
+  const [color, setColor] = useState<ColorKey>(routine?.color ?? null);
   const [days, setDays] = useState<number[]>(routine?.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6]);
   const [reminder, setReminder] = useState(routine?.reminderTime ?? '');
   const [timerMin, setTimerMin] = useState(
@@ -38,6 +47,7 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
     const payload = {
       name: name.trim(),
       emoji,
+      color,
       scheduleDays: days,
       reminderTime: reminder || null,
       timerSeconds: timerMin ? Number(timerMin) * 60 : null,
@@ -94,6 +104,26 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
       </fieldset>
 
       <fieldset>
+        <legend className="text-sm font-medium">Card color</legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {COLOR_CHOICES.map((c) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => setColor(c.key)}
+              aria-pressed={color === c.key}
+              className={`flex h-14 min-w-16 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-3 text-xs font-medium transition-transform active:scale-90 ${
+                color === c.key ? 'border-ink' : 'border-line'
+              }`}
+            >
+              <span className="h-5 w-5 rounded-full" style={{ background: c.swatch }} />
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend className="text-sm font-medium">Days</legend>
         <div className="mt-2 flex gap-2">
           {DAY_LABELS.map((label, d) => (
@@ -104,7 +134,7 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
               aria-pressed={days.includes(d)}
               aria-label={['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d]}
               className={`h-12 w-12 rounded-full font-semibold transition-transform active:scale-90 ${
-                days.includes(d) ? 'bg-ink text-white' : 'bg-card border border-line text-ink-soft'
+                days.includes(d) ? 'bg-ink text-on-ink' : 'bg-card border border-line text-ink-soft'
               }`}
             >
               {label}
@@ -148,7 +178,7 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
       <button
         type="submit"
         disabled={busy}
-        className="rounded-full bg-ink px-8 py-5 text-lg font-semibold text-white transition-transform active:scale-95 disabled:opacity-50"
+        className="rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95 disabled:opacity-50"
       >
         {routine ? 'Save changes' : 'Create routine'}
       </button>

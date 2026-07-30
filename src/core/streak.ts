@@ -16,12 +16,16 @@
 //    the bank is full, progress is paused (not silently discarded), so a
 //    "would-be" freeze is never lost — kind, and easy to explain in UI.
 // 6. Breaking a streak resets earn progress to 0. Banked freezes survive.
+// 7. A "rest day" (user-declared planned skip) bridges the streak for
+//    free: no freeze consumed, no growth — the day just doesn't count
+//    against you. The monthly limit lives in the app layer, not here.
 
 import type { LocalDate, StreakState } from './types';
 import { addDays, daysBetween } from './dates';
 
 export const MAX_FREEZES = 3;
 export const COMPLETIONS_PER_FREEZE = 7;
+export const REST_DAYS_PER_MONTH = 2;
 
 export interface FreezeEvent {
   kind: 'earned' | 'consumed';
@@ -40,7 +44,11 @@ export interface StreakResult {
  * earlier). Call this on read and before applyCompletion so the stored
  * state never lags reality.
  */
-export function reconcile(state: StreakState, today: LocalDate): StreakResult {
+export function reconcile(
+  state: StreakState,
+  today: LocalDate,
+  restDays?: ReadonlySet<LocalDate>,
+): StreakResult {
   const events: FreezeEvent[] = [];
   const next = { ...state };
 
@@ -52,7 +60,10 @@ export function reconcile(state: StreakState, today: LocalDate): StreakResult {
   // Today itself is never "missed" — the user can still complete it.
   while (daysBetween(next.lastCompletedOn!, today) > 1) {
     const missedDay = addDays(next.lastCompletedOn!, 1);
-    if (next.freezeBalance > 0) {
+    if (restDays?.has(missedDay)) {
+      // Planned skip: bridge for free, no freeze spent, no growth.
+      next.lastCompletedOn = missedDay;
+    } else if (next.freezeBalance > 0) {
       next.freezeBalance -= 1;
       next.lastCompletedOn = missedDay; // alive through the frozen day
       events.push({ kind: 'consumed', onDate: missedDay });
@@ -72,8 +83,12 @@ export function reconcile(state: StreakState, today: LocalDate): StreakResult {
  * Record a completion for `today`. Reconciles first, so callers can pass
  * stale state safely. Idempotent for repeat completions on the same day.
  */
-export function applyCompletion(state: StreakState, today: LocalDate): StreakResult {
-  const { state: next, events } = reconcile(state, today);
+export function applyCompletion(
+  state: StreakState,
+  today: LocalDate,
+  restDays?: ReadonlySet<LocalDate>,
+): StreakResult {
+  const { state: next, events } = reconcile(state, today, restDays);
 
   if (next.lastCompletedOn === today && next.currentStreak > 0) {
     return { state: next, events }; // already counted today

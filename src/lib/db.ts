@@ -24,6 +24,7 @@ function mapRoutine(r: any): Routine {
     userId: r.user_id,
     name: r.name,
     emoji: r.emoji,
+    color: r.color ?? null,
     position: r.position,
     scheduleDays: r.schedule_days,
     reminderTime: r.reminder_time ? String(r.reminder_time).slice(0, 5) : null,
@@ -114,6 +115,7 @@ export async function createRoutine(
   input: {
     name: string;
     emoji?: string;
+    color?: Routine['color'];
     scheduleDays?: number[];
     reminderTime?: string | null;
     timerSeconds?: number | null;
@@ -126,6 +128,7 @@ export async function createRoutine(
       user_id: userId,
       name: input.name,
       emoji: input.emoji ?? '✨',
+      color: input.color ?? null,
       schedule_days: input.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6],
       reminder_time: input.reminderTime ?? null,
       timer_seconds: input.timerSeconds ?? null,
@@ -142,13 +145,14 @@ export async function createRoutine(
 export async function updateRoutine(
   db: Db,
   routineId: string,
-  patch: Partial<Pick<Routine, 'name' | 'emoji' | 'scheduleDays' | 'reminderTime' | 'timerSeconds' | 'position' | 'isArchived'>>,
+  patch: Partial<Pick<Routine, 'name' | 'emoji' | 'color' | 'scheduleDays' | 'reminderTime' | 'timerSeconds' | 'position' | 'isArchived'>>,
 ) {
   const { error } = await db
     .from('routines')
     .update({
       ...(patch.name !== undefined && { name: patch.name }),
       ...(patch.emoji !== undefined && { emoji: patch.emoji }),
+      ...(patch.color !== undefined && { color: patch.color }),
       ...(patch.scheduleDays !== undefined && { schedule_days: patch.scheduleDays }),
       ...(patch.reminderTime !== undefined && { reminder_time: patch.reminderTime }),
       ...(patch.timerSeconds !== undefined && { timer_seconds: patch.timerSeconds }),
@@ -303,6 +307,75 @@ export async function listCompletions(
     routineId: c.routine_id,
     completedOn: c.completed_on,
   }));
+}
+
+// ---- rest days & run progress --------------------------------------------
+
+export async function listRestDays(db: Db, routineId: string, since: string): Promise<string[]> {
+  const { data, error } = await db
+    .from('rest_days')
+    .select('on_date')
+    .eq('routine_id', routineId)
+    .gte('on_date', since);
+  fail(error);
+  return data.map((r: any) => r.on_date);
+}
+
+/** Rest days already taken for a routine in the month containing `date`. */
+export async function countRestDaysInMonth(db: Db, routineId: string, date: string): Promise<number> {
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const [y, m] = date.split('-').map(Number);
+  const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  const { count, error } = await db
+    .from('rest_days')
+    .select('*', { count: 'exact', head: true })
+    .eq('routine_id', routineId)
+    .gte('on_date', monthStart)
+    .lt('on_date', nextMonth);
+  fail(error);
+  return count ?? 0;
+}
+
+export async function addRestDay(db: Db, userId: string, routineId: string, onDate: string) {
+  const { error } = await db
+    .from('rest_days')
+    .insert({ routine_id: routineId, user_id: userId, on_date: onDate });
+  if (error && error.code !== '23505') throw new Error(error.message); // dup = fine
+}
+
+export async function getRunProgress(
+  db: Db,
+  routineId: string,
+): Promise<{ onDate: string; stepIndex: number } | null> {
+  const { data, error } = await db
+    .from('run_progress')
+    .select('on_date, step_index')
+    .eq('routine_id', routineId)
+    .maybeSingle();
+  fail(error);
+  return data ? { onDate: data.on_date, stepIndex: data.step_index } : null;
+}
+
+export async function saveRunProgress(
+  db: Db,
+  userId: string,
+  routineId: string,
+  onDate: string,
+  stepIndex: number,
+) {
+  const { error } = await db.from('run_progress').upsert({
+    routine_id: routineId,
+    user_id: userId,
+    on_date: onDate,
+    step_index: stepIndex,
+    updated_at: new Date().toISOString(),
+  });
+  fail(error);
+}
+
+export async function clearRunProgress(db: Db, routineId: string) {
+  const { error } = await db.from('run_progress').delete().eq('routine_id', routineId);
+  fail(error);
 }
 
 // ---- subscriptions & push -------------------------------------------------

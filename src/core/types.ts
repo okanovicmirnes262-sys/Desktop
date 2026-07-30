@@ -18,11 +18,15 @@ export interface Profile {
   onboarded: boolean;
 }
 
+export type RoutineColor = 'sky' | 'mint' | 'blush' | 'butter';
+
 export interface Routine {
   id: RoutineId;
   userId: UserId;
   name: string;
   emoji: string;
+  /** Card color; null = automatic rotation. */
+  color: RoutineColor | null;
   position: number;
   /** Active weekdays, 0 = Sunday … 6 = Saturday. */
   scheduleDays: number[];

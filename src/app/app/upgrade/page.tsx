@@ -47,7 +47,7 @@ export default async function UpgradePage() {
       <div className="grid grid-cols-1 gap-4">
         <a
           href={provider.checkoutUrl('yearly', me)}
-          className="rounded-card bg-ink p-6 text-white transition-transform active:scale-[0.98]"
+          className="rounded-card bg-ink p-6 text-on-ink transition-transform active:scale-[0.98]"
         >
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-semibold">{PRICING.yearly.label}</span>
@@ -55,7 +55,7 @@ export default async function UpgradePage() {
               2 months free
             </span>
           </div>
-          <p className="mt-2 text-white/70">Billed once a year via Whop.</p>
+          <p className="mt-2 text-on-ink/70">Billed once a year via Whop.</p>
         </a>
 
         <a

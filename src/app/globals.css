@@ -6,6 +6,7 @@
   --paper: #f4f3ef;      /* app background */
   --card: #ffffff;       /* light cards */
   --ink: #191a1e;        /* dark cards / primary text */
+  --on-ink: #ffffff;     /* text sitting on an ink surface */
   --ink-soft: #5c5e66;   /* secondary text (4.5:1 on paper) */
   --sky: #bfdff2;        /* pastel blue accent */
   --sky-deep: #8ec8ea;   /* primary action fill (with ink text) */
@@ -15,10 +16,30 @@
   --line: #e4e2db;       /* hairline borders */
 }
 
+/* Dark mode: follows the device setting. Same layout, inverted surfaces —
+   "ink" becomes light so primary buttons stay the highest-contrast thing
+   on screen, pastels become deep muted tints. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151619;
+    --card: #1e2024;
+    --ink: #ecebe7;
+    --on-ink: #17181c;
+    --ink-soft: #a4a6ae;
+    --sky: #2b3d4c;
+    --sky-deep: #7db8de;
+    --mint: #28392f;
+    --blush: #402c37;
+    --butter: #3e3626;
+    --line: #33353a;
+  }
+}
+
 @theme inline {
   --color-paper: var(--paper);
   --color-card: var(--card);
   --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
   --color-ink-soft: var(--ink-soft);
   --color-sky: var(--sky);
   --color-sky-deep: var(--sky-deep);
@@ -30,22 +51,25 @@
   --radius-card: 1.75rem; /* soft 28px corners everywhere */
 }
 
-/* Premium themes swap the accent pastels only — layout never changes. */
-[data-theme="dusk"] {
-  --paper: #efeef4;
-  --sky: #ccc7ee;
-  --sky-deep: #aba2e3;
-  --mint: #d5e3f4;
-  --blush: #eacfe4;
-  --line: #ddd9e8;
-}
-[data-theme="meadow"] {
-  --paper: #f0f4ee;
-  --sky: #cfe8c9;
-  --sky-deep: #a8d89e;
-  --mint: #e0efd4;
-  --blush: #f0e3c8;
-  --line: #dde4d7;
+/* Premium themes swap the accent pastels only — layout never changes.
+   Scoped to light scheme; in dark mode the dark palette wins. */
+@media (prefers-color-scheme: light) {
+  [data-theme="dusk"] {
+    --paper: #efeef4;
+    --sky: #ccc7ee;
+    --sky-deep: #aba2e3;
+    --mint: #d5e3f4;
+    --blush: #eacfe4;
+    --line: #ddd9e8;
+  }
+  [data-theme="meadow"] {
+    --paper: #f0f4ee;
+    --sky: #cfe8c9;
+    --sky-deep: #a8d89e;
+    --mint: #e0efd4;
+    --blush: #f0e3c8;
+    --line: #dde4d7;
+  }
 }
 
 body {
@@ -70,3 +94,19 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 .ts-pop { animation: ts-pop 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Celebration confetti — soft pastel pieces drifting down once.
+   Killed automatically by the reduced-motion rule above. */
+@keyframes ts-confetti {
+  0% { transform: translateY(-8vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(540deg); opacity: 0.7; }
+}
+.ts-confetti-piece {
+  position: fixed;
+  top: 0;
+  width: 10px;
+  height: 14px;
+  border-radius: 3px;
+  pointer-events: none;
+  animation: ts-confetti var(--fall-duration, 2.6s) ease-in var(--fall-delay, 0s) both;
+}

@@ -4,7 +4,7 @@ import { getProfile, getSubscription } from '@/lib/db';
 import { hasPremium } from '@/core/entitlements';
 import { signOutAction } from '@/lib/actions';
 import { PushManager } from '@/components/PushManager';
-import { ThemePicker, TimezoneSync } from '@/components/SettingsControls';
+import { SoundToggle, ThemePicker, TimezoneSync } from '@/components/SettingsControls';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -29,6 +29,14 @@ export default async function SettingsPage() {
           Firm, on-time nudges for routines with a reminder time set.
         </p>
         <PushManager />
+      </section>
+
+      <section className="rounded-card bg-card p-6">
+        <h2 className="text-lg font-semibold">Celebration sound</h2>
+        <p className="mb-4 mt-1 text-sm text-ink-soft">
+          A soft chime when you finish a routine. This device only.
+        </p>
+        <SoundToggle />
       </section>
 
       <section className="rounded-card bg-card p-6">

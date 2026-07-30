@@ -176,6 +176,58 @@ describe('reconcile (read-time catch-up, no completion)', () => {
   });
 });
 
+describe('rest days (planned skips)', () => {
+  it('a rest day bridges the gap without consuming a freeze', () => {
+    const start = stateWith({
+      currentStreak: 5,
+      bestStreak: 5,
+      lastCompletedOn: '2026-07-05',
+      freezeBalance: 2,
+    });
+    const rest = new Set(['2026-07-06']);
+    const { state, events } = applyCompletion(start, '2026-07-07', rest);
+    expect(state.currentStreak).toBe(6); // survived and grew with today
+    expect(state.freezeBalance).toBe(2); // untouched
+    expect(events.filter((e) => e.kind === 'consumed')).toHaveLength(0);
+  });
+
+  it('rest day + freeze combine across a two-day gap', () => {
+    const start = stateWith({
+      currentStreak: 5,
+      bestStreak: 5,
+      lastCompletedOn: '2026-07-05',
+      freezeBalance: 1,
+    });
+    const rest = new Set(['2026-07-06']); // rested the 6th, plain-missed the 7th
+    const { state, events } = applyCompletion(start, '2026-07-08', rest);
+    expect(state.currentStreak).toBe(6);
+    expect(state.freezeBalance).toBe(0); // freeze covered the 7th
+    expect(events).toContainEqual({ kind: 'consumed', onDate: '2026-07-07' });
+  });
+
+  it('a rest day alone does not grow the streak', () => {
+    const start = stateWith({
+      currentStreak: 5,
+      bestStreak: 5,
+      lastCompletedOn: '2026-07-05',
+    });
+    const { state } = reconcile(start, '2026-07-07', new Set(['2026-07-06']));
+    expect(state.currentStreak).toBe(5);
+    expect(state.lastCompletedOn).toBe('2026-07-06'); // alive through the rest day
+  });
+
+  it('without a rest day the same gap would need a freeze', () => {
+    const start = stateWith({
+      currentStreak: 5,
+      bestStreak: 5,
+      lastCompletedOn: '2026-07-05',
+      freezeBalance: 0,
+    });
+    const { state } = applyCompletion(start, '2026-07-07'); // no rest, no freezes
+    expect(state.currentStreak).toBe(1); // broke
+  });
+});
+
 describe('earning freezes', () => {
   const week = [
     '2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04',
