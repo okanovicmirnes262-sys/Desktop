@@ -1,5 +1,5 @@
 import { Snowflake } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
 import { COMPLETIONS_PER_FREEZE, MAX_FREEZES } from '@/core/streak';
 import { RoutineIcon } from '@/components/icons';
@@ -7,9 +7,7 @@ import { RoutineIcon } from '@/components/icons';
 // Freezes: what's banked per routine, and the recent earn/spend history.
 export default async function FreezesPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return null;
 
   const routines = await db.listRoutines(supabase, user.id);

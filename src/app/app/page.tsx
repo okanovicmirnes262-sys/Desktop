@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Check, Plus, User } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
 import { addDays, minutesOfDay, timeInTz, todayInTz, weekdayOf } from '@/core/dates';
 import { reconcile } from '@/core/streak';
@@ -20,9 +20,7 @@ function metaLine(count: number, totalSeconds: number, reminder: string | null):
 // Today: one focus card for what's next, quiet rows for the rest.
 export default async function TodayPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return null; // middleware already guards this
 
   const [profile, routines, sub] = await Promise.all([

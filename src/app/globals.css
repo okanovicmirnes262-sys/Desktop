@@ -135,9 +135,10 @@ html[data-appearance="dark"] {
   --radius-card-lg: 1.875rem; /* 30px focus card */
 }
 
+/* Note: no background-attachment: fixed — it forces full repaints on
+   every scroll frame on mobile Safari/Chrome and makes the app feel slow. */
 body {
   background: var(--app-bg);
-  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;

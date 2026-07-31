@@ -1,16 +1,14 @@
 // Home-screen shortcut target: jump straight into the most relevant
 // unfinished routine — zero navigation between intention and starting.
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
 import { todayInTz, weekdayOf } from '@/core/dates';
 
 export async function GET(request: Request) {
   const { origin } = new URL(request.url);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return NextResponse.redirect(`${origin}/login`);
 
   const [profile, routines] = await Promise.all([

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import { getSubscription } from '@/lib/db';
 import { hasPremium, PRICING } from '@/core/entitlements';
 import { getPaymentProvider } from '@/core/payments';
@@ -7,9 +7,7 @@ import { VerifyPremiumButton } from '@/components/VerifyPremiumButton';
 
 export default async function UpgradePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return null;
 
   const sub = await getSubscription(supabase, user.id);
@@ -25,7 +23,7 @@ export default async function UpgradePage() {
           
           <h2 className="mt-4 text-2xl font-semibold">You&apos;re on Premium</h2>
           <p className="mt-2 text-ink-soft">
-            Unlimited routines, themes, full stats and backup are unlocked.
+            Unlimited routines, full stats and backup are unlocked.
           </p>
         </div>
         <Link href="/app" className="text-center text-ink-soft underline underline-offset-4">
@@ -40,7 +38,7 @@ export default async function UpgradePage() {
       <header className="px-1">
         <h1 className="text-[26px] font-bold tracking-[-0.01em]">Go Premium</h1>
         <p className="mt-2 text-ink-soft">
-          Unlimited routines · calm themes · full stats · backup
+          Unlimited routines · full stats · backup
         </p>
       </header>
 
@@ -71,8 +69,8 @@ export default async function UpgradePage() {
 
       <ul className="shadow-card rounded-card flex flex-col gap-3 bg-card p-6 text-[15px] font-medium">
         <li>✓ Unlimited routines (free plan holds 3)</li>
-        <li>✓ Themes: Dusk & Meadow</li>
-        <li>✓ Completion rate + calendar heatmap</li>
+        <li>✓ Calendar heatmap for every routine</li>
+        <li>✓ Completion rate + progress insights</li>
         <li>✓ One-tap backup of all your data</li>
       </ul>
     </main>

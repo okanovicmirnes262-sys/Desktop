@@ -1,14 +1,12 @@
 // Premium backup: download all of the user's data as one JSON file.
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import { getSubscription } from '@/lib/db';
 import { canUseFeature } from '@/core/entitlements';
 
 export async function GET() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const sub = await getSubscription(supabase, user.id);

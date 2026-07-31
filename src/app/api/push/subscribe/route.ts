@@ -1,13 +1,11 @@
 // Stores (or removes) a browser's push subscription for the signed-in user.
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import { savePushSubscription } from '@/lib/db';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const body = await request.json();
@@ -20,9 +18,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { endpoint } = await request.json();

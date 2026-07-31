@@ -5,7 +5,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import * as db from '@/lib/db';
 import {
@@ -23,9 +23,7 @@ import { SEED_ROUTINES } from '@/core/seed';
 
 async function requireUser() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase); // local JWT check, no network
   if (!user) redirect('/login');
   return { supabase, user };
 }
@@ -251,15 +249,6 @@ export async function updateWeeklyEmailAction(enabled: boolean) {
   const { supabase, user } = await requireUser();
   await db.updateProfile(supabase, user.id, { weeklyEmail: enabled });
   revalidatePath('/app/settings');
-}
-
-export async function updateThemeAction(theme: string) {
-  const { supabase, user } = await requireUser();
-  const sub = await db.getSubscription(supabase, user.id);
-  const { canUseFeature } = await import('@/core/entitlements');
-  if (theme !== 'default' && !canUseFeature('themes', sub)) return;
-  await db.updateProfile(supabase, user.id, { theme });
-  revalidatePath('/app');
 }
 
 export async function signOutAction() {

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
 import { hasPremium } from '@/core/entitlements';
 import { signOutAction } from '@/lib/actions';
@@ -14,9 +14,7 @@ import {
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return null;
 
   const [profile, sub, routines] = await Promise.all([
@@ -85,7 +83,7 @@ export default async function SettingsPage() {
           <ChevronRight size={16} className="text-ink-faint" />
         </Link>
         <div className="mx-5 h-px bg-line" />
-        <Link href={premium ? '/app/upgrade' : '/app/upgrade'} className="flex items-center gap-3 px-5 py-4">
+        <Link href="/app/upgrade" className="flex items-center gap-3 px-5 py-4">
           <span className="flex-1 text-[15.5px] font-bold">Account</span>
           <span className="max-w-40 truncate text-sm text-ink-soft">{user.email}</span>
           <ChevronRight size={16} className="text-ink-faint" />

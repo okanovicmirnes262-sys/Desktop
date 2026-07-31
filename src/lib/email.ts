@@ -23,7 +23,6 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 }
 
 export interface WeeklyRow {
-  emoji: string;
   name: string;
   done: number;
   scheduled: number;
@@ -36,7 +35,7 @@ export function weeklySummaryHtml(displayName: string | null, rows: WeeklyRow[])
     .map(
       (r) => `
       <tr>
-        <td style="padding:8px 12px;font-size:16px;">${r.emoji} ${r.name}</td>
+        <td style="padding:8px 12px;font-size:16px;">${r.name}</td>
         <td style="padding:8px 12px;font-size:16px;text-align:center;">${r.done}/${r.scheduled}</td>
         <td style="padding:8px 12px;font-size:16px;text-align:center;">${r.currentStreak}</td>
       </tr>`,

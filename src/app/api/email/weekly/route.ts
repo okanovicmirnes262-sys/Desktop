@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
     const { data: routines } = await db
       .from('routines')
-      .select('id, name, emoji, schedule_days')
+      .select('id, name, schedule_days')
       .eq('user_id', profile.id)
       .eq('is_archived', false);
     if (!routines || routines.length === 0) continue;
@@ -59,7 +59,6 @@ export async function GET(request: Request) {
         if ((r.schedule_days as number[]).includes(weekdayOf(addDays(today, -i)))) scheduled++;
       }
       return {
-        emoji: r.emoji,
         name: r.name,
         done: (completions ?? []).filter((c) => c.routine_id === r.id).length,
         scheduled,

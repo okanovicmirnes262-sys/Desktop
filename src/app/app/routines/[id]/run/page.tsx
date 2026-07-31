@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
 import { RunPlayer } from '@/components/RunPlayer';
 import { todayInTz } from '@/core/dates';
@@ -17,9 +17,7 @@ export default async function RunPage({
   const routine = await db.getRoutine(supabase, id);
   if (!routine) notFound();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   const [steps, progress, profile] = await Promise.all([
     db.listSteps(supabase, id),
     db.getRunProgress(supabase, id),

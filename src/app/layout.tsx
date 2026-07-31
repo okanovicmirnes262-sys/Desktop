@@ -37,7 +37,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${archivo.variable} h-full antialiased`}>
+    // suppressHydrationWarning: the inline script below may set
+    // data-appearance on <html> before React hydrates.
+    <html lang="en" className={`${archivo.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col">
         <script dangerouslySetInnerHTML={{ __html: appearanceInit }} />
         {children}

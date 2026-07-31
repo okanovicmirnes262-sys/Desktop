@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
 import { addDays, todayInTz } from '@/core/dates';
 import { reconcile } from '@/core/streak';
@@ -10,9 +10,7 @@ import { Heatmap, type DayCell } from '@/components/Heatmap';
 // Your progress: two KPIs, then one calm card per routine.
 export default async function StatsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser(supabase);
   if (!user) return null;
 
   const [profile, routines, sub] = await Promise.all([
