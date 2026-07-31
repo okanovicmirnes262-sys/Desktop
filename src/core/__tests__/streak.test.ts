@@ -3,8 +3,10 @@ import {
   applyCompletion,
   initialStreakState,
   reconcile,
+  reconstructStreak,
   COMPLETIONS_PER_FREEZE,
   MAX_FREEZES,
+  PREMIUM_RULES,
 } from '../streak';
 import type { StreakState } from '../types';
 
@@ -228,6 +230,24 @@ describe('rest days (planned skips)', () => {
   });
 });
 
+describe('reconstructStreak (revival)', () => {
+  it('counts consecutive completed days back from the end date', () => {
+    const done = new Set(['2026-07-03', '2026-07-04', '2026-07-05']);
+    expect(reconstructStreak(done, new Set(), '2026-07-05')).toBe(3);
+  });
+
+  it('bridges rest days and freeze-covered days without counting them', () => {
+    const done = new Set(['2026-07-01', '2026-07-02', '2026-07-04', '2026-07-06']);
+    const bridged = new Set(['2026-07-03', '2026-07-05']); // rest + frozen
+    expect(reconstructStreak(done, bridged, '2026-07-06')).toBe(4);
+  });
+
+  it('stops at a plain missed day', () => {
+    const done = new Set(['2026-07-01', '2026-07-04', '2026-07-05']);
+    expect(reconstructStreak(done, new Set(), '2026-07-05')).toBe(2);
+  });
+});
+
 describe('earning freezes', () => {
   const week = [
     '2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04',
@@ -259,6 +279,21 @@ describe('earning freezes', () => {
     expect(state.freezeBalance).toBe(MAX_FREEZES);
     // Progress paused at 6 while full — nothing silently discarded.
     expect(state.freezeProgress).toBe(6);
+  });
+
+  it('premium rules: earns every 5 completions, banks up to 5', () => {
+    let state = stateWith({});
+    const days = ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05'];
+    for (const d of days) state = applyCompletion(state, d, undefined, PREMIUM_RULES).state;
+    expect(state.freezeBalance).toBe(1); // earned on the 5th day
+    const start = stateWith({
+      currentStreak: 1,
+      lastCompletedOn: '2026-07-01',
+      freezeBalance: 4,
+      freezeProgress: 4,
+    });
+    const { state: s2 } = applyCompletion(start, '2026-07-02', undefined, PREMIUM_RULES);
+    expect(s2.freezeBalance).toBe(5); // premium cap
   });
 
   it('resumes earning after a freeze is spent', () => {

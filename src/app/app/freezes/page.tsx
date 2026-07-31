@@ -1,7 +1,9 @@
 import { Snowflake } from 'lucide-react';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
-import { COMPLETIONS_PER_FREEZE, MAX_FREEZES, reconcile } from '@/core/streak';
+import { reconcile } from '@/core/streak';
+import { hasPremium, limitsFor } from '@/core/entitlements';
+import { ReviveStreakButton } from '@/components/ReviveStreakButton';
 import { addDays, todayInTz } from '@/core/dates';
 import { RoutineIcon } from '@/components/icons';
 
@@ -11,10 +13,13 @@ export default async function FreezesPage() {
   const user = await getSessionUser(supabase);
   if (!user) return null;
 
-  const [profile, routines] = await Promise.all([
+  const [profile, routines, sub] = await Promise.all([
     db.getProfile(supabase, user.id),
     db.listRoutines(supabase, user.id),
+    db.getSubscription(supabase, user.id),
   ]);
+  const premium = hasPremium(sub);
+  const rules = limitsFor(sub).streakRules;
   const today = todayInTz(profile.timezone);
   const ids = routines.map((r) => r.id);
   const [storedMap, restMap, events] = await Promise.all([
@@ -36,8 +41,9 @@ export default async function FreezesPage() {
       <header className="px-0.5">
         <h1 className="text-[26px] font-bold tracking-[-0.01em]">Freezes</h1>
         <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
-          Every {COMPLETIONS_PER_FREEZE} completions bank a freeze (max {MAX_FREEZES}). A freeze
-          quietly covers a missed day so your streak survives.
+          Every {rules.completionsPerFreeze} completions bank a freeze (max {rules.maxFreezes}).
+          A freeze quietly covers a missed day so your streak survives.
+          {!premium && ' Premium banks 5, earned every 5 days.'}
         </p>
       </header>
 
@@ -54,13 +60,13 @@ export default async function FreezesPage() {
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-[17px] font-bold">{routine.name}</h2>
                 <p className="text-xs text-ink-soft">
-                  {balance === MAX_FREEZES
+                  {balance >= rules.maxFreezes
                     ? 'Bank full — earning pauses so nothing is wasted'
-                    : `${progress} of ${COMPLETIONS_PER_FREEZE} completions toward the next freeze`}
+                    : `${progress} of ${rules.completionsPerFreeze} completions toward the next freeze`}
                 </p>
               </div>
               <div className="flex shrink-0 gap-1.5">
-                {Array.from({ length: MAX_FREEZES }, (_, i) => (
+                {Array.from({ length: rules.maxFreezes }, (_, i) => (
                   <span
                     key={i}
                     className={`flex h-8 w-8 items-center justify-center rounded-xl ${
@@ -72,6 +78,9 @@ export default async function FreezesPage() {
                 ))}
               </div>
             </div>
+            {premium && streak && streak.currentStreak === 0 && streak.bestStreak > 0 && (
+              <ReviveStreakButton routineId={routine.id} />
+            )}
           </section>
         );
       })}

@@ -49,6 +49,24 @@ export default async function StatsPage() {
     };
   });
 
+  // Premium insights: when routines stick, and this week vs last week.
+  const allCompletions = [...completionsMap.values()].flat();
+  const hourBuckets = { morning: 0, afternoon: 0, evening: 0 };
+  for (const c of allCompletions) {
+    if (!c.completedAt) continue;
+    const h = new Date(c.completedAt).getUTCHours(); // rough buckets are fine
+    if (h < 12) hourBuckets.morning += 1;
+    else if (h < 18) hourBuckets.afternoon += 1;
+    else hourBuckets.evening += 1;
+  }
+  const bestBucket = (Object.entries(hourBuckets) as [string, number][]).sort(
+    (a, b) => b[1] - a[1],
+  )[0];
+  const thisWeek = allCompletions.filter((c) => c.completedOn > addDays(today, -7)).length;
+  const lastWeek = allCompletions.filter(
+    (c) => c.completedOn > addDays(today, -14) && c.completedOn <= addDays(today, -7),
+  ).length;
+
   const bestCurrent = Math.max(0, ...rows.map((r) => r.streak?.currentStreak ?? 0));
   const rates = rows.map((r) => r.rate).filter((r): r is number => r !== null);
   const avgRate = rates.length ? Math.round((rates.reduce((a, b) => a + b, 0) / rates.length) * 100) : null;
@@ -82,6 +100,22 @@ export default async function StatsPage() {
           <p className="ts-label mt-2">Completion</p>
         </div>
       </div>
+
+      {fullStats && allCompletions.length >= 3 && (
+        <section className="shadow-card rounded-card bg-card p-5">
+          <p className="ts-label mb-2">Insights</p>
+          <p className="text-[13.5px] leading-relaxed text-ink-soft">
+            Routines stick best for you in the <strong className="text-ink">{bestBucket[0]}</strong>.
+            This week: <strong className="text-ink">{thisWeek}</strong> done
+            {lastWeek > 0 && (
+              <>
+                {' '}({thisWeek >= lastWeek ? '+' : ''}{thisWeek - lastWeek} vs last week)
+              </>
+            )}
+            .
+          </p>
+        </section>
+      )}
 
       {rows.length === 0 && (
         <p className="shadow-card rounded-card bg-card p-6 text-center text-[13.5px] text-ink-soft">

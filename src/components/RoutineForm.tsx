@@ -11,13 +11,16 @@ import { ICON_CHOICES, ROUTINE_ICONS, iconKeyOf } from '@/components/icons';
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-export function RoutineForm({ routine }: { routine?: Routine }) {
+export function RoutineForm({ routine, premium = false }: { routine?: Routine; premium?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState(routine?.name ?? '');
   const [icon, setIcon] = useState(routine ? iconKeyOf(routine.emoji) : 'sun');
   const [days, setDays] = useState<number[]>(routine?.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6]);
   const [reminder, setReminder] = useState(routine?.reminderTime ?? '');
   const [reminderWeekend, setReminderWeekend] = useState(routine?.reminderTimeWeekend ?? '');
+  const [extra1, setExtra1] = useState(routine?.reminderTimesExtra?.[0] ?? '');
+  const [extra2, setExtra2] = useState(routine?.reminderTimesExtra?.[1] ?? '');
+  const [secondBell, setSecondBell] = useState(routine?.secondBell ?? false);
   const [timerMin, setTimerMin] = useState(
     routine?.timerSeconds ? String(Math.round(routine.timerSeconds / 60)) : '',
   );
@@ -42,6 +45,8 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
       scheduleDays: days,
       reminderTime: reminder || null,
       reminderTimeWeekend: reminder && reminderWeekend ? reminderWeekend : null,
+      reminderTimesExtra: premium && reminder ? [extra1, extra2].filter(Boolean) : [],
+      secondBell: premium && Boolean(reminder) && secondBell,
       timerSeconds: timerMin ? Number(timerMin) * 60 : null,
     };
     if (routine) {
@@ -158,6 +163,45 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
             Different time for Saturday &amp; Sunday. Empty = same as weekdays.
           </p>
         </div>
+      )}
+
+      {reminder && premium && (
+        <div className="flex flex-col gap-3">
+          <p className="ts-label">More reminders (Premium)</p>
+          <div className="grid grid-cols-2 gap-2.5">
+            <input
+              type="time"
+              value={extra1}
+              onChange={(e) => setExtra1(e.target.value)}
+              aria-label="Extra reminder 1"
+              className="shadow-card rounded-[20px] bg-card px-4 py-3.5 text-base font-bold tabular-nums outline-none"
+            />
+            <input
+              type="time"
+              value={extra2}
+              onChange={(e) => setExtra2(e.target.value)}
+              aria-label="Extra reminder 2"
+              className="shadow-card rounded-[20px] bg-card px-4 py-3.5 text-base font-bold tabular-nums outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={secondBell}
+            onClick={() => setSecondBell(!secondBell)}
+            className={`rounded-[20px] px-5 py-3.5 text-left text-sm font-semibold transition-colors ${
+              secondBell ? 'bg-primary text-on-primary' : 'shadow-card bg-card text-ink-soft'
+            }`}
+          >
+            Second bell — one repeat nudge 30 min later if not started
+          </button>
+        </div>
+      )}
+
+      {reminder && !premium && (
+        <p className="text-xs text-ink-soft">
+          Premium adds up to 2 more reminder times and a &ldquo;second bell&rdquo; repeat nudge.
+        </p>
       )}
 
       <div className="flex flex-col gap-2">

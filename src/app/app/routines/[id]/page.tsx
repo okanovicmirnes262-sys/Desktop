@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
+import { hasPremium } from '@/core/entitlements';
 import { RoutineForm } from '@/components/RoutineForm';
 import { StepEditor } from '@/components/StepEditor';
 import { DeleteRoutineButton } from '@/components/DeleteRoutineButton';
@@ -13,7 +14,12 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
   const supabase = await createClient();
   const routine = await db.getRoutine(supabase, id); // RLS hides others' routines
   if (!routine) notFound();
-  const steps = await db.listSteps(supabase, id);
+  const user = await getSessionUser(supabase);
+  const [steps, sub] = await Promise.all([
+    db.listSteps(supabase, id),
+    user ? db.getSubscription(supabase, user.id) : Promise.resolve(null),
+  ]);
+  const premium = hasPremium(sub);
 
   return (
     <main className="flex flex-col gap-7">
@@ -36,7 +42,7 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
       <details className="shadow-card rounded-card bg-card p-5">
         <summary className="cursor-pointer text-[17px] font-bold">Routine settings</summary>
         <div className="mt-5">
-          <RoutineForm routine={routine} />
+          <RoutineForm routine={routine} premium={premium} />
         </div>
       </details>
 

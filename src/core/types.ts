@@ -36,6 +36,10 @@ export interface Routine {
   reminderTime: string | null;
   /** Weekend (Sat/Sun) override for the reminder; null = same as weekdays. */
   reminderTimeWeekend: string | null;
+  /** Extra reminder times (premium, up to 2). */
+  reminderTimesExtra: string[];
+  /** One repeat nudge ~30 min after the main reminder (premium). */
+  secondBell: boolean;
   /** Optional whole-routine timer. */
   timerSeconds: number | null;
   isArchived: boolean;
@@ -54,6 +58,8 @@ export interface Completion {
   id: string;
   routineId: RoutineId;
   completedOn: LocalDate;
+  /** Wall-clock completion moment (ISO), when fetched. */
+  completedAt?: string | null;
 }
 
 export interface StreakState {

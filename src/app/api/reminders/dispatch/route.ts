@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   // timezones are fetched in a second batched query instead.
   const { data: routines, error } = await db
     .from('routines')
-    .select('id, user_id, name, reminder_time, reminder_time_weekend, schedule_days')
+    .select('id, user_id, name, reminder_time, reminder_time_weekend, reminder_times_extra, second_bell, schedule_days')
     .eq('is_archived', false)
     .not('reminder_time', 'is', null);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -40,8 +40,12 @@ export async function GET(request: Request) {
     .in('id', userIds);
   const tzByUser = new Map((profiles ?? []).map((p) => [p.id, p.timezone as string]));
 
-  // First pass: which routines are due right now (user-local)?
-  const due: { id: string; user_id: string; name: string; time: string; today: string }[] = [];
+  // First pass: which reminder slots are due right now (user-local)?
+  // slot 0 = main time, 1..2 = premium extras, 9 = second bell (a single
+  // repeat ~30 min after the main time when the routine hasn't started).
+  const due: {
+    id: string; user_id: string; name: string; time: string; today: string; slot: number;
+  }[] = [];
   for (const r of routines) {
     const tz = tzByUser.get(r.user_id) ?? 'UTC';
     const today = todayInTz(tz);
@@ -49,14 +53,27 @@ export async function GET(request: Request) {
     if (!(r.schedule_days as number[]).includes(weekday)) continue;
 
     const isWeekend = weekday === 0 || weekday === 6;
-    const effectiveTime = String(
+    const mainTime = String(
       (isWeekend && r.reminder_time_weekend) || r.reminder_time,
     ).slice(0, 5);
-    const reminderMin = minutesOfDay(effectiveTime);
     const nowMin = minutesOfDay(timeInTz(tz));
-    if (nowMin < reminderMin || nowMin > reminderMin + CATCH_UP_MINUTES) continue;
 
-    due.push({ id: r.id, user_id: r.user_id, name: r.name, time: effectiveTime, today });
+    const slots: { time: string; slot: number }[] = [{ time: mainTime, slot: 0 }];
+    for (const [i, t] of ((r.reminder_times_extra as string[] | null) ?? []).entries()) {
+      if (i < 2) slots.push({ time: String(t).slice(0, 5), slot: i + 1 });
+    }
+    if (r.second_bell) {
+      const bellMin = minutesOfDay(mainTime) + 30;
+      slots.push({
+        time: `${String(Math.floor(bellMin / 60) % 24).padStart(2, '0')}:${String(bellMin % 60).padStart(2, '0')}`,
+        slot: 9,
+      });
+    }
+    for (const { time, slot } of slots) {
+      const reminderMin = minutesOfDay(time);
+      if (nowMin < reminderMin || nowMin > reminderMin + CATCH_UP_MINUTES) continue;
+      due.push({ id: r.id, user_id: r.user_id, name: r.name, time, today, slot });
+    }
   }
   if (due.length === 0) return NextResponse.json({ ok: true, sent: 0 });
 
@@ -86,10 +103,10 @@ export async function GET(request: Request) {
     // even with overlapping cron runs.
     const { error: dupe } = await db
       .from('reminder_dispatches')
-      .insert({ routine_id: d.id, on_date: d.today });
-    if (dupe) continue; // already dispatched today
+      .insert({ routine_id: d.id, on_date: d.today, slot: d.slot });
+    if (dupe) continue; // this slot already dispatched today
 
-    const copy = reminderCopy(d.name, d.time, d.id);
+    const copy = reminderCopy(d.name, d.time, `${d.id}-${d.slot}`);
     for (const target of subsByUser.get(d.user_id) ?? []) {
       const alive = await sendPush(target, copy).catch(() => true); // transient errors: keep sub
       if (!alive) {

@@ -5,7 +5,6 @@
 
 import { useState, useTransition } from 'react';
 import { takeRestDayAction } from '@/lib/actions';
-import { REST_DAYS_PER_MONTH } from '@/core/streak';
 
 export function RestDayButton({ routineId }: { routineId: string }) {
   const [pending, startTransition] = useTransition();
@@ -22,7 +21,7 @@ export function RestDayButton({ routineId }: { routineId: string }) {
         startTransition(async () => {
           const res = await takeRestDayAction(routineId);
           if (!res.ok && res.error === 'limit') {
-            setMessage(`Rest days used up this month (${REST_DAYS_PER_MONTH}/month)`);
+            setMessage('Rest days used up this month');
           }
         })
       }

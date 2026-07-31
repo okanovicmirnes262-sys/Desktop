@@ -31,6 +31,8 @@ function mapRoutine(r: any): Routine {
     reminderTimeWeekend: r.reminder_time_weekend
       ? String(r.reminder_time_weekend).slice(0, 5)
       : null,
+    reminderTimesExtra: (r.reminder_times_extra ?? []).map((t: string) => String(t).slice(0, 5)),
+    secondBell: r.second_bell ?? false,
     timerSeconds: r.timer_seconds,
     isArchived: r.is_archived,
   };
@@ -130,6 +132,8 @@ export async function createRoutine(
     scheduleDays?: number[];
     reminderTime?: string | null;
     reminderTimeWeekend?: string | null;
+    reminderTimesExtra?: string[];
+    secondBell?: boolean;
     timerSeconds?: number | null;
     position?: number;
   },
@@ -144,6 +148,8 @@ export async function createRoutine(
       schedule_days: input.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6],
       reminder_time: input.reminderTime ?? null,
       reminder_time_weekend: input.reminderTimeWeekend ?? null,
+      reminder_times_extra: input.reminderTimesExtra ?? [],
+      second_bell: input.secondBell ?? false,
       timer_seconds: input.timerSeconds ?? null,
       position: input.position ?? 0,
     })
@@ -158,7 +164,7 @@ export async function createRoutine(
 export async function updateRoutine(
   db: Db,
   routineId: string,
-  patch: Partial<Pick<Routine, 'name' | 'emoji' | 'color' | 'scheduleDays' | 'reminderTime' | 'reminderTimeWeekend' | 'timerSeconds' | 'position' | 'isArchived'>>,
+  patch: Partial<Pick<Routine, 'name' | 'emoji' | 'color' | 'scheduleDays' | 'reminderTime' | 'reminderTimeWeekend' | 'reminderTimesExtra' | 'secondBell' | 'timerSeconds' | 'position' | 'isArchived'>>,
 ) {
   const { error } = await db
     .from('routines')
@@ -171,6 +177,10 @@ export async function updateRoutine(
       ...(patch.reminderTimeWeekend !== undefined && {
         reminder_time_weekend: patch.reminderTimeWeekend,
       }),
+      ...(patch.reminderTimesExtra !== undefined && {
+        reminder_times_extra: patch.reminderTimesExtra,
+      }),
+      ...(patch.secondBell !== undefined && { second_bell: patch.secondBell }),
       ...(patch.timerSeconds !== undefined && { timer_seconds: patch.timerSeconds }),
       ...(patch.position !== undefined && { position: patch.position }),
       ...(patch.isArchived !== undefined && { is_archived: patch.isArchived }),
@@ -346,13 +356,13 @@ export async function listCompletionsBulk(
   if (routineIds.length === 0) return map;
   const { data, error } = await db
     .from('completions')
-    .select('id, routine_id, completed_on')
+    .select('id, routine_id, completed_on, completed_at')
     .in('routine_id', routineIds)
     .gte('completed_on', sinceDate)
     .order('completed_on');
   fail(error);
   for (const c of data) {
-    map.get(c.routine_id)?.push({ id: c.id, routineId: c.routine_id, completedOn: c.completed_on });
+    map.get(c.routine_id)?.push({ id: c.id, routineId: c.routine_id, completedOn: c.completed_on, completedAt: c.completed_at });
   }
   return map;
 }
@@ -480,6 +490,86 @@ export async function saveRunProgress(
 
 export async function clearRunProgress(db: Db, routineId: string) {
   const { error } = await db.from('run_progress').delete().eq('routine_id', routineId);
+  fail(error);
+}
+
+// ---- premium: revivals & partners ----------------------------------------
+
+export async function countRevivalsInMonth(db: Db, userId: string, date: string): Promise<number> {
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const [y, m] = date.split('-').map(Number);
+  const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  const { count, error } = await db
+    .from('streak_revivals')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('revived_on', monthStart)
+    .lt('revived_on', nextMonth);
+  fail(error);
+  return count ?? 0;
+}
+
+export async function addRevival(
+  db: Db,
+  userId: string,
+  routineId: string,
+  revivedOn: string,
+  restoredTo: number,
+) {
+  const { error } = await db.from('streak_revivals').insert({
+    user_id: userId,
+    routine_id: routineId,
+    revived_on: revivedOn,
+    restored_to: restoredTo,
+  });
+  fail(error);
+}
+
+/** Freeze-consumed dates for one routine — used to reconstruct a streak. */
+export async function listConsumedFreezeDates(
+  db: Db,
+  routineId: string,
+  since: string,
+): Promise<string[]> {
+  const { data, error } = await db
+    .from('freeze_events')
+    .select('on_date')
+    .eq('routine_id', routineId)
+    .eq('kind', 'consumed')
+    .gte('on_date', since);
+  fail(error);
+  return data.map((e: any) => e.on_date);
+}
+
+export async function getPartnerInvite(db: Db, userId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('partner_invites')
+    .select('code')
+    .eq('user_id', userId)
+    .maybeSingle();
+  fail(error);
+  return data?.code ?? null;
+}
+
+export async function savePartnerInvite(db: Db, userId: string, code: string) {
+  const { error } = await db
+    .from('partner_invites')
+    .upsert({ user_id: userId, code }, { onConflict: 'code' });
+  fail(error);
+}
+
+export async function getPartnerSummary(
+  db: Db,
+): Promise<{ displayName: string | null; topStreak: number } | null> {
+  const { data, error } = await db.rpc('partner_summary');
+  fail(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return { displayName: row.display_name ?? null, topStreak: row.top_streak ?? 0 };
+}
+
+export async function leavePartnership(db: Db, userId: string) {
+  const { error } = await db.from('partnerships').delete().or(`a.eq.${userId},b.eq.${userId}`);
   fail(error);
 }
 

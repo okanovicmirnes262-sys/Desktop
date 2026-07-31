@@ -5,6 +5,7 @@ import * as db from '@/lib/db';
 import { hasPremium } from '@/core/entitlements';
 import { signOutAction } from '@/lib/actions';
 import { PushManager } from '@/components/PushManager';
+import { PartnerCard } from '@/components/PartnerCard';
 import {
   AppearanceControl,
   SoundToggle,
@@ -23,7 +24,10 @@ export default async function SettingsPage() {
     db.listRoutines(supabase, user.id),
   ]);
   const premium = hasPremium(sub);
-  const streaks = await db.getStreaksBulk(supabase, routines.map((r) => r.id));
+  const [streaks, partner] = await Promise.all([
+    db.getStreaksBulk(supabase, routines.map((r) => r.id)),
+    premium ? db.getPartnerSummary(supabase).catch(() => null) : Promise.resolve(null),
+  ]);
   const banked = [...streaks.values()].reduce((n, s) => n + s.freezeBalance, 0);
 
   return (
@@ -91,6 +95,21 @@ export default async function SettingsPage() {
       </section>
 
       <section className="shadow-card rounded-card bg-card p-5">
+        <p className="ts-label mb-3">Accountability partner</p>
+        {premium ? (
+          <PartnerCard partner={partner} />
+        ) : (
+          <p className="text-xs text-ink-soft">
+            Share streaks with one friend — a{' '}
+            <Link href="/app/upgrade" className="text-primary underline underline-offset-4">
+              Premium
+            </Link>{' '}
+            feature.
+          </p>
+        )}
+      </section>
+
+      <section className="shadow-card rounded-card bg-card p-5">
         <p className="text-sm font-semibold">
           Plan: {premium ? 'Premium' : 'Free'}
           {!premium && (
@@ -103,13 +122,29 @@ export default async function SettingsPage() {
           )}
         </p>
         {premium && (
-          <a
-            href="/api/backup"
-            download
-            className="mt-3 block rounded-full bg-surface-alt px-5 py-2.5 text-center text-sm font-semibold text-primary"
-          >
-            Download backup (JSON)
-          </a>
+          <div className="mt-3 flex flex-col gap-2">
+            <a
+              href="/api/report"
+              target="_blank"
+              className="block rounded-full bg-surface-alt px-5 py-2.5 text-center text-sm font-semibold text-primary"
+            >
+              Progress report (print / PDF)
+            </a>
+            <a
+              href="/api/export/csv"
+              download
+              className="block rounded-full bg-surface-alt px-5 py-2.5 text-center text-sm font-semibold text-primary"
+            >
+              Export CSV
+            </a>
+            <a
+              href="/api/backup"
+              download
+              className="block rounded-full bg-surface-alt px-5 py-2.5 text-center text-sm font-semibold text-primary"
+            >
+              Download backup (JSON)
+            </a>
+          </div>
         )}
         <form action={signOutAction} className="mt-3">
           <button className="w-full rounded-full bg-surface-tint px-5 py-2.5 text-sm font-semibold text-ink-soft">

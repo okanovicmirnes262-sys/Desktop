@@ -3,9 +3,34 @@
 
 import type { Subscription } from './types';
 
+import { DEFAULT_RULES, PREMIUM_RULES, type StreakRules } from './streak';
+
 export const FREE_LIMITS = {
   maxRoutines: 3,
+  restDaysPerMonth: 2,
+  extraReminders: 0,
 } as const;
+
+export const PREMIUM_LIMITS = {
+  maxRoutines: Infinity,
+  restDaysPerMonth: 5,
+  extraReminders: 2,
+} as const;
+
+export interface PlanLimits {
+  maxRoutines: number;
+  restDaysPerMonth: number;
+  extraReminders: number;
+  streakRules: StreakRules;
+}
+
+/** All plan-dependent numbers in one place. */
+export function limitsFor(sub: Subscription | null): PlanLimits {
+  const premium = hasPremium(sub);
+  return premium
+    ? { ...PREMIUM_LIMITS, streakRules: PREMIUM_RULES }
+    : { ...FREE_LIMITS, streakRules: DEFAULT_RULES };
+}
 
 export const PRICING = {
   monthly: { amount: 5, currency: 'EUR', label: '€5 / month' },

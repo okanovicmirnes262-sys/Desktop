@@ -30,7 +30,7 @@ export interface WeeklyRow {
 }
 
 /** Warm, short weekly summary. States facts, never guilts. */
-export function weeklySummaryHtml(displayName: string | null, rows: WeeklyRow[]): string {
+export function weeklySummaryHtml(displayName: string | null, rows: WeeklyRow[], trend?: string | null): string {
   const items = rows
     .map(
       (r) => `
@@ -58,6 +58,7 @@ export function weeklySummaryHtml(displayName: string | null, rows: WeeklyRow[])
       </tr>
       ${items}
     </table>
+    ${trend ? `<p style="margin:16px 0 0;color:#2a2760;font-size:14px;font-weight:600;">${trend}</p>` : ''}
     <p style="margin:16px 0 0;color:#5c5e66;font-size:14px;">
       Next week starts fresh. One tiny step at a time.
     </p>

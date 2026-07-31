@@ -5,7 +5,7 @@ import * as db from '@/lib/db';
 import { addDays, minutesOfDay, timeInTz, todayInTz, weekdayOf } from '@/core/dates';
 import { reconcile } from '@/core/streak';
 import { canCreateRoutine } from '@/core/entitlements';
-import { SEED_ROUTINES } from '@/core/seed';
+import { FREE_TEMPLATES } from '@/core/seed';
 import { seedTemplateAction } from '@/lib/actions';
 import { RestDayButton } from '@/components/RestDayButton';
 import { RoutineIcon } from '@/components/icons';
@@ -251,7 +251,7 @@ export default async function TodayPage() {
           </section>
 
           <p className="ts-label mt-3 px-1">Or start from a template</p>
-          {SEED_ROUTINES.map((seed) => {
+          {FREE_TEMPLATES.map((seed) => {
             const mins = Math.max(
               1,
               Math.round(seed.steps.reduce((n, s) => n + (s.timerSeconds ?? 0), 0) / 60),

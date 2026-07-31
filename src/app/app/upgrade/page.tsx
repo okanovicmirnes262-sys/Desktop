@@ -38,7 +38,7 @@ export default async function UpgradePage() {
       <header className="px-1">
         <h1 className="text-[26px] font-bold tracking-[-0.01em]">Go Premium</h1>
         <p className="mt-2 text-ink-soft">
-          Unlimited routines · full stats · backup
+          Bigger freeze bank · streak revival · full stats · partner · and more
         </p>
       </header>
 
@@ -69,9 +69,14 @@ export default async function UpgradePage() {
 
       <ul className="shadow-card rounded-card flex flex-col gap-3 bg-card p-6 text-[15px] font-medium">
         <li>✓ Unlimited routines (free plan holds 3)</li>
-        <li>✓ Calendar heatmap for every routine</li>
-        <li>✓ Completion rate + progress insights</li>
-        <li>✓ One-tap backup of all your data</li>
+        <li>✓ Bigger freeze bank: 5 freezes, earned every 5 days</li>
+        <li>✓ Streak revival — bring back a broken streak, once a month</li>
+        <li>✓ 5 rest days a month (free: 2)</li>
+        <li>✓ Full stats: heatmap, completion rate, insights</li>
+        <li>✓ 9 extra expert routine templates</li>
+        <li>✓ Extra reminder times + second-bell nudge</li>
+        <li>✓ Accountability partner — share streaks with a friend</li>
+        <li>✓ Printable progress report, CSV export, backup</li>
       </ul>
     </main>
   );

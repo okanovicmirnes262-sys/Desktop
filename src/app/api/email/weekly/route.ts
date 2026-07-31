@@ -23,6 +23,12 @@ export async function GET(request: Request) {
     .eq('weekly_email', true);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const { data: activeSubs } = await db
+    .from('subscriptions')
+    .select('user_id')
+    .eq('status', 'active');
+  const premiumUsers = new Set((activeSubs ?? []).map((s) => s.user_id));
+
   // Map user ids to emails via the auth admin API.
   const emails = new Map<string, string>();
   for (let page = 1; page <= 500; page++) { // no practical cap; stops when a page comes back short
@@ -39,6 +45,7 @@ export async function GET(request: Request) {
 
     const today = todayInTz(profile.timezone);
     const weekAgo = addDays(today, -7);
+    const twoWeeksAgo = addDays(today, -14);
 
     const { data: routines } = await db
       .from('routines')
@@ -49,7 +56,7 @@ export async function GET(request: Request) {
 
     const ids = routines.map((r) => r.id);
     const [{ data: completions }, { data: streaks }] = await Promise.all([
-      db.from('completions').select('routine_id, completed_on').in('routine_id', ids).gte('completed_on', weekAgo).lt('completed_on', today),
+      db.from('completions').select('routine_id, completed_on').in('routine_id', ids).gte('completed_on', twoWeeksAgo).lt('completed_on', today),
       db.from('streaks').select('routine_id, current_streak').in('routine_id', ids),
     ]);
 
@@ -60,17 +67,28 @@ export async function GET(request: Request) {
       }
       return {
         name: r.name,
-        done: (completions ?? []).filter((c) => c.routine_id === r.id).length,
+        done: (completions ?? []).filter(
+          (c) => c.routine_id === r.id && c.completed_on >= weekAgo,
+        ).length,
         scheduled,
         currentStreak:
           (streaks ?? []).find((s) => s.routine_id === r.id)?.current_streak ?? 0,
       };
     });
 
+    // Premium extra: this week vs last week, one honest line.
+    const prevDone = (completions ?? []).filter((c) => c.completed_on < weekAgo).length;
+    const thisDone = rows.reduce((n, r) => n + r.done, 0);
+    const trend = premiumUsers.has(profile.id)
+      ? thisDone >= prevDone
+        ? `Up ${thisDone - prevDone} from last week's ${prevDone}. Keep the pace.`
+        : `Last week was ${prevDone} — this week ${thisDone}. Streak freezes have your back.`
+      : null;
+
     const ok = await sendEmail(
       to,
-      'Your week in tiny steps 🐾',
-      weeklySummaryHtml(profile.display_name, rows),
+      'Your week in tiny steps',
+      weeklySummaryHtml(profile.display_name, rows, trend),
     ).catch(() => false);
     if (ok) sent += 1;
   }

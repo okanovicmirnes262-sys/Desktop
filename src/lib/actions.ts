@@ -12,11 +12,11 @@ import {
   applyCompletion,
   initialStreakState,
   reconcile,
+  reconstructStreak,
   MILESTONES,
-  REST_DAYS_PER_MONTH,
 } from '@/core/streak';
-import { todayInTz } from '@/core/dates';
-import { canCreateRoutine } from '@/core/entitlements';
+import { addDays, todayInTz } from '@/core/dates';
+import { canCreateRoutine, hasPremium, limitsFor } from '@/core/entitlements';
 import { getPaymentProvider } from '@/core/payments';
 import { toSubscription } from '@/core/payments/provider';
 import { SEED_ROUTINES } from '@/core/seed';
@@ -48,6 +48,8 @@ export async function createRoutineAction(input: {
   scheduleDays: number[];
   reminderTime: string | null;
   reminderTimeWeekend: string | null;
+  reminderTimesExtra: string[];
+  secondBell: boolean;
   timerSeconds: number | null;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const { supabase, user } = await requireUser();
@@ -58,8 +60,11 @@ export async function createRoutineAction(input: {
   if (!canCreateRoutine(routines.length, sub)) {
     return { ok: false, error: 'free_limit' };
   }
+  const limits = limitsFor(sub);
   const routine = await db.createRoutine(supabase, user.id, {
     ...input,
+    reminderTimesExtra: input.reminderTimesExtra.slice(0, limits.extraReminders),
+    secondBell: input.secondBell && limits.extraReminders > 0,
     position: routines.length,
   });
   revalidatePath('/app');
@@ -75,11 +80,23 @@ export async function updateRoutineAction(
     scheduleDays?: number[];
     reminderTime?: string | null;
     reminderTimeWeekend?: string | null;
+    reminderTimesExtra?: string[];
+    secondBell?: boolean;
     timerSeconds?: number | null;
   },
 ) {
-  const { supabase } = await requireUser(); // RLS scopes the update to the owner
-  await db.updateRoutine(supabase, routineId, patch);
+  const { supabase, user } = await requireUser(); // RLS scopes the update to the owner
+  const sub = await db.getSubscription(supabase, user.id);
+  const limits = limitsFor(sub);
+  await db.updateRoutine(supabase, routineId, {
+    ...patch,
+    ...(patch.reminderTimesExtra !== undefined && {
+      reminderTimesExtra: patch.reminderTimesExtra.slice(0, limits.extraReminders),
+    }),
+    ...(patch.secondBell !== undefined && {
+      secondBell: patch.secondBell && limits.extraReminders > 0,
+    }),
+  });
   revalidatePath('/app');
   revalidatePath(`/app/routines/${routineId}`);
 }
@@ -144,11 +161,12 @@ export interface CompletionCelebration {
 /** Called when the user finishes the last step of a run. */
 export async function completeRoutineAction(routineId: string): Promise<CompletionCelebration> {
   const { supabase, user } = await requireUser();
-  // Ownership check + profile in parallel.
-  const [profile, , stored0] = await Promise.all([
+  // Ownership check + profile + plan in parallel.
+  const [profile, , stored0, sub] = await Promise.all([
     db.getProfile(supabase, user.id),
     requireOwnRoutine(supabase, routineId),
     db.getStreak(supabase, routineId),
+    db.getSubscription(supabase, user.id),
   ]);
   const today = todayInTz(profile.timezone);
 
@@ -156,7 +174,7 @@ export async function completeRoutineAction(routineId: string): Promise<Completi
   const restDays = new Set(
     await db.listRestDays(supabase, routineId, stored.lastCompletedOn ?? today),
   );
-  const { state, events } = applyCompletion(stored, today, restDays);
+  const { state, events } = applyCompletion(stored, today, restDays, limitsFor(sub).streakRules);
 
   // Independent writes run in parallel — one round trip of latency.
   await Promise.all([
@@ -207,9 +225,10 @@ export async function takeRestDayAction(
   routineId: string,
 ): Promise<{ ok: true } | { ok: false; error: 'limit' | 'already_done' }> {
   const { supabase, user } = await requireUser();
-  const [profile] = await Promise.all([
+  const [profile, , sub] = await Promise.all([
     db.getProfile(supabase, user.id),
     requireOwnRoutine(supabase, routineId),
+    db.getSubscription(supabase, user.id),
   ]);
   const today = todayInTz(profile.timezone);
 
@@ -217,7 +236,7 @@ export async function takeRestDayAction(
   if (doneToday.length > 0) return { ok: false, error: 'already_done' };
 
   const used = await db.countRestDaysInMonth(supabase, routineId, today);
-  if (used >= REST_DAYS_PER_MONTH) return { ok: false, error: 'limit' };
+  if (used >= limitsFor(sub).restDaysPerMonth) return { ok: false, error: 'limit' };
 
   await db.addRestDay(supabase, user.id, routineId, today);
   revalidatePath('/app');
@@ -243,7 +262,12 @@ export async function seedTemplateAction(templateName: string) {
   const { supabase, user } = await requireUser();
   const seed = SEED_ROUTINES.find((s) => s.name === templateName);
   if (!seed) return;
-  const existing = await db.listRoutines(supabase, user.id);
+  const [existing, sub] = await Promise.all([
+    db.listRoutines(supabase, user.id),
+    db.getSubscription(supabase, user.id),
+  ]);
+  if (seed.premium && !hasPremium(sub)) return; // library is premium
+  if (!canCreateRoutine(existing.length, sub)) return;
   if (existing.some((r) => r.name === seed.name)) return; // already added
   const routine = await db.createRoutine(supabase, user.id, {
     name: seed.name,
@@ -288,6 +312,98 @@ export async function signOutAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect('/login');
+}
+
+// ---- premium: streak revival ----------------------------------------------
+
+/** Premium: restore a recently broken streak, once per calendar month.
+ *  The restored length is reconstructed from real history (completions +
+ *  rest days + freeze-covered days). */
+export async function reviveStreakAction(
+  routineId: string,
+): Promise<{ ok: true; restored: number } | { ok: false; error: 'premium' | 'limit' | 'nothing' }> {
+  const { supabase, user } = await requireUser();
+  const [profile, , sub, stored] = await Promise.all([
+    db.getProfile(supabase, user.id),
+    requireOwnRoutine(supabase, routineId),
+    db.getSubscription(supabase, user.id),
+    db.getStreak(supabase, routineId),
+  ]);
+  if (!hasPremium(sub)) return { ok: false, error: 'premium' };
+
+  const today = todayInTz(profile.timezone);
+  const used = await db.countRevivalsInMonth(supabase, user.id, today);
+  if (used >= 1) return { ok: false, error: 'limit' }; // 1 revival / month
+
+  const since = addDays(today, -120);
+  const [completions, restDays, frozenDays] = await Promise.all([
+    db.listCompletions(supabase, routineId, since),
+    db.listRestDays(supabase, routineId, since),
+    db.listConsumedFreezeDates(supabase, routineId, since),
+  ]);
+  const completed = new Set(completions.map((c) => c.completedOn));
+  if (completed.size === 0) return { ok: false, error: 'nothing' };
+  const lastDone = completions[completions.length - 1].completedOn;
+  const restored = reconstructStreak(completed, new Set([...restDays, ...frozenDays]), lastDone);
+  if (restored === 0) return { ok: false, error: 'nothing' };
+
+  const base = stored ?? initialStreakState(routineId);
+  await Promise.all([
+    db.saveStreak(supabase, user.id, {
+      ...base,
+      currentStreak: restored,
+      bestStreak: Math.max(base.bestStreak, restored),
+      // Alive through yesterday: today's completion continues the streak.
+      lastCompletedOn: addDays(today, -1),
+    }),
+    db.addRevival(supabase, user.id, routineId, today, restored),
+  ]);
+  revalidatePath('/app');
+  revalidatePath('/app/stats');
+  revalidatePath('/app/freezes');
+  return { ok: true, restored };
+}
+
+// ---- premium: accountability partner --------------------------------------
+
+export async function createPartnerInviteAction(): Promise<
+  { ok: true; code: string } | { ok: false; error: 'premium' }
+> {
+  const { supabase, user } = await requireUser();
+  const sub = await db.getSubscription(supabase, user.id);
+  if (!hasPremium(sub)) return { ok: false, error: 'premium' };
+  const existing = await db.getPartnerInvite(supabase, user.id);
+  if (existing) return { ok: true, code: existing };
+  const code = Array.from({ length: 6 }, () =>
+    'ABCDEFGHJKMNPQRSTUVWXYZ23456789'.charAt(Math.floor(Math.random() * 31)),
+  ).join('');
+  await db.savePartnerInvite(supabase, user.id, code);
+  return { ok: true, code };
+}
+
+export async function redeemPartnerCodeAction(
+  code: string,
+): Promise<{ ok: boolean; message: string }> {
+  const { supabase, user } = await requireUser();
+  const sub = await db.getSubscription(supabase, user.id);
+  if (!hasPremium(sub)) return { ok: false, message: 'Partners are a Premium feature.' };
+  const { data, error } = await supabase.rpc('redeem_partner_code', {
+    invite_code: code.trim().toUpperCase(),
+  });
+  if (error) return { ok: false, message: 'Something went wrong. Try again.' };
+  const result = String(data);
+  revalidatePath('/app/settings');
+  if (result === 'ok') return { ok: true, message: 'Partner linked!' };
+  if (result === 'own_code') return { ok: false, message: "That's your own code." };
+  if (result === 'already_partnered')
+    return { ok: false, message: 'One of you already has a partner.' };
+  return { ok: false, message: 'Invalid code.' };
+}
+
+export async function leavePartnershipAction() {
+  const { supabase, user } = await requireUser();
+  await db.leavePartnership(supabase, user.id);
+  revalidatePath('/app/settings');
 }
 
 // ---- premium verification -------------------------------------------------

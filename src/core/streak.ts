@@ -30,6 +30,17 @@ export const REST_DAYS_PER_MONTH = 2;
 /** Streak lengths that get an extra-special celebration + a badge. */
 export const MILESTONES = [7, 30, 100] as const;
 
+/** Earning/banking rules — premium gets a bigger, faster freeze bank. */
+export interface StreakRules {
+  maxFreezes: number;
+  completionsPerFreeze: number;
+}
+export const DEFAULT_RULES: StreakRules = {
+  maxFreezes: MAX_FREEZES,
+  completionsPerFreeze: COMPLETIONS_PER_FREEZE,
+};
+export const PREMIUM_RULES: StreakRules = { maxFreezes: 5, completionsPerFreeze: 5 };
+
 export interface FreezeEvent {
   kind: 'earned' | 'consumed';
   /** The date the freeze covered (consumed) or was earned on. */
@@ -90,6 +101,7 @@ export function applyCompletion(
   state: StreakState,
   today: LocalDate,
   restDays?: ReadonlySet<LocalDate>,
+  rules: StreakRules = DEFAULT_RULES,
 ): StreakResult {
   const { state: next, events } = reconcile(state, today, restDays);
 
@@ -107,9 +119,9 @@ export function applyCompletion(
   next.bestStreak = Math.max(next.bestStreak, next.currentStreak);
 
   // Earn progress pauses while the bank is full so nothing is wasted.
-  if (next.freezeBalance < MAX_FREEZES) {
+  if (next.freezeBalance < rules.maxFreezes) {
     next.freezeProgress += 1;
-    if (next.freezeProgress >= COMPLETIONS_PER_FREEZE) {
+    if (next.freezeProgress >= rules.completionsPerFreeze) {
       next.freezeProgress = 0;
       next.freezeBalance += 1;
       events.push({ kind: 'earned', onDate: today });
@@ -117,6 +129,27 @@ export function applyCompletion(
   }
 
   return { state: next, events };
+}
+
+/**
+ * Reconstruct the streak length that ended at `endDate` from raw history —
+ * used by the premium "revive streak" feature after a break. A day counts
+ * when completed; rest days and freeze-covered days bridge without
+ * counting; anything else ends the walk.
+ */
+export function reconstructStreak(
+  completedDates: ReadonlySet<LocalDate>,
+  bridgedDates: ReadonlySet<LocalDate>,
+  endDate: LocalDate,
+): number {
+  let streak = 0;
+  let day = endDate;
+  for (let guard = 0; guard < 1000; guard++) {
+    if (completedDates.has(day)) streak += 1;
+    else if (!bridgedDates.has(day)) break;
+    day = addDays(day, -1);
+  }
+  return streak;
 }
 
 /** Fresh state for a brand-new routine. */
