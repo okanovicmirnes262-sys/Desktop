@@ -1,11 +1,9 @@
 'use client';
 
-// Visual countdown for time blindness: a big ring that visibly drains.
-// Calm colors on purpose — no alarm-red panic states. The global
-// prefers-reduced-motion CSS turns the smooth transition into stepped
-// once-a-second updates automatically.
-//
-// To restart a timer, remount it with a different React `key`.
+// Visual countdown for time blindness: a conic-gradient ring that fills
+// as time elapses, digits in the middle, tap anywhere on it to pause.
+// Calm colors — no alarm-red panic states. Restart by remounting with a
+// different React `key`.
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -13,10 +11,12 @@ interface TimerRingProps {
   totalSeconds: number;
   running: boolean;
   onFinish?: () => void;
+  /** Tap-to-pause handler; the ring is a button when provided. */
+  onToggle?: () => void;
   size?: number;
 }
 
-export function TimerRing({ totalSeconds, running, onFinish, size = 260 }: TimerRingProps) {
+export function TimerRing({ totalSeconds, running, onFinish, onToggle, size = 236 }: TimerRingProps) {
   const [remaining, setRemaining] = useState(totalSeconds);
   const endAtRef = useRef<number | null>(null);
   const finishedRef = useRef(false);
@@ -41,53 +41,43 @@ export function TimerRing({ totalSeconds, running, onFinish, size = 260 }: Timer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
-  const stroke = 18;
-  const r = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * r;
-  const fraction = totalSeconds === 0 ? 0 : remaining / totalSeconds;
-
+  const elapsedPct = totalSeconds === 0 ? 100 : ((totalSeconds - remaining) / totalSeconds) * 100;
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
-
-  // The ring "breathes" for the final 10 seconds — a gentle heads-up
-  // instead of an alarm. Disabled automatically under reduced motion.
   const closing = running && remaining > 0 && remaining <= 10;
+  const inner = size - 36;
 
-  return (
+  const ring = (
     <div
-      className={`relative ${closing ? 'ts-breathe' : ''}`}
-      style={{ width: size, height: size }}
+      className={`flex items-center justify-center rounded-full transition-opacity duration-150 ${
+        closing ? 'ts-breathe' : ''
+      } ${running ? '' : 'opacity-60'}`}
+      style={{
+        width: size,
+        height: size,
+        background: `conic-gradient(var(--accent) ${elapsedPct}%, rgba(255,255,255,0.14) 0)`,
+      }}
       role="timer"
-      aria-label={`${mins} minutes ${secs} seconds remaining`}
+      aria-label={`${mins} minutes ${secs} seconds remaining${running ? '' : ', paused'}`}
     >
-      <svg width={size} height={size} className="-rotate-90">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke="var(--line)"
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={remaining === 0 ? 'var(--mint)' : 'var(--sky-deep)'}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - fraction)}
-          style={{ transition: 'stroke-dashoffset 300ms linear' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-6xl font-semibold tabular-nums tracking-tight">
+      <div
+        className="flex items-center justify-center rounded-full"
+        style={{ width: inner, height: inner, background: '#241f4e' }}
+      >
+        <span
+          className="font-extrabold tabular-nums tracking-[-0.02em] text-white"
+          style={{ fontSize: 58, lineHeight: 1 }}
+        >
           {mins}:{String(secs).padStart(2, '0')}
         </span>
-        {remaining === 0 && <span className="mt-1 text-ink-soft">Time&apos;s up</span>}
       </div>
     </div>
+  );
+
+  if (!onToggle) return ring;
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={!running} className="rounded-full">
+      {ring}
+    </button>
   );
 }

@@ -1,5 +1,5 @@
-// Two example ADHD-friendly routines offered to new users during onboarding.
-// Pure data — the app layer persists these via Supabase.
+// Template routines offered on first run (and one-tap "Use" rows).
+// `icon` is an icon key from src/components/icons — no emoji.
 
 export interface SeedStep {
   title: string;
@@ -8,7 +8,7 @@ export interface SeedStep {
 
 export interface SeedRoutine {
   name: string;
-  emoji: string;
+  icon: string;
   scheduleDays: number[];
   reminderTime: string | null;
   steps: SeedStep[];
@@ -17,7 +17,7 @@ export interface SeedRoutine {
 export const SEED_ROUTINES: SeedRoutine[] = [
   {
     name: 'Morning',
-    emoji: '🌅',
+    icon: 'sun',
     scheduleDays: [0, 1, 2, 3, 4, 5, 6],
     reminderTime: '08:00',
     steps: [
@@ -31,7 +31,7 @@ export const SEED_ROUTINES: SeedRoutine[] = [
   },
   {
     name: 'Wind-down',
-    emoji: '🌙',
+    icon: 'moon',
     scheduleDays: [0, 1, 2, 3, 4, 5, 6],
     reminderTime: '21:30',
     steps: [
@@ -39,6 +39,18 @@ export const SEED_ROUTINES: SeedRoutine[] = [
       { title: 'Tomorrow’s clothes on the chair', timerSeconds: 180 },
       { title: 'Brush teeth', timerSeconds: 120 },
       { title: 'Lights down, screens off', timerSeconds: null },
+    ],
+  },
+  {
+    name: 'Move your body',
+    icon: 'dumbbell',
+    scheduleDays: [1, 3, 5],
+    reminderTime: '17:00',
+    steps: [
+      { title: 'Change into comfy clothes', timerSeconds: null },
+      { title: 'Stretch', timerSeconds: 120 },
+      { title: 'Move — walk, dance, anything', timerSeconds: 600 },
+      { title: 'Water + a deep breath', timerSeconds: null },
     ],
   },
 ];

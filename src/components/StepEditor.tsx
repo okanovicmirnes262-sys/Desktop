@@ -5,6 +5,7 @@
 // works identically on touch.
 
 import { useState, useTransition } from 'react';
+import { ChevronDown, ChevronUp, Timer, X } from 'lucide-react';
 import type { Step } from '@/core/types';
 import {
   addStepAction,
@@ -38,29 +39,27 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
 
   return (
     <section aria-label="Steps" className="flex flex-col gap-3">
-      <h2 className="px-1 text-sm font-medium text-ink-soft">
-        Steps — small enough that starting feels easy
-      </h2>
+      <p className="ts-label px-1">Steps — small enough that starting feels easy</p>
 
       <ol className="flex flex-col gap-2">
         {steps.map((step, i) => (
-          <li key={step.id} className="flex items-center gap-2 rounded-2xl bg-card p-3">
+          <li key={step.id} className="shadow-card flex items-center gap-2 rounded-[20px] bg-card p-3">
             <div className="flex flex-col">
               <button
                 aria-label={`Move "${step.title}" up`}
                 disabled={i === 0 || pending}
                 onClick={() => move(i, -1)}
-                className="h-8 w-10 rounded-lg text-ink-soft disabled:opacity-25"
+                className="flex h-8 w-10 items-center justify-center rounded-lg text-ink-faint disabled:opacity-25"
               >
-                ▲
+                <ChevronUp size={18} />
               </button>
               <button
                 aria-label={`Move "${step.title}" down`}
                 disabled={i === steps.length - 1 || pending}
                 onClick={() => move(i, 1)}
-                className="h-8 w-10 rounded-lg text-ink-soft disabled:opacity-25"
+                className="flex h-8 w-10 items-center justify-center rounded-lg text-ink-faint disabled:opacity-25"
               >
-                ▼
+                <ChevronDown size={18} />
               </button>
             </div>
 
@@ -74,12 +73,13 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
                   startTransition(() => updateStepAction(routineId, step.id, { title }));
                 }
               }}
-              className="min-w-0 flex-1 rounded-xl bg-transparent px-2 py-2 text-lg outline-none focus:bg-paper"
+              className="min-w-0 flex-1 rounded-xl bg-transparent px-2 py-2 text-[15.5px] font-semibold outline-none focus:bg-surface-tint"
             />
 
             {step.timerSeconds ? (
-              <span className="shrink-0 rounded-full bg-sky px-2.5 py-1 text-sm font-medium">
-                ⏱ {Math.round(step.timerSeconds / 60)}m
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-alt px-2.5 py-1 text-xs font-semibold text-primary">
+                <Timer size={12} strokeWidth={2} />
+                {Math.round(step.timerSeconds / 60)}m
               </span>
             ) : null}
 
@@ -87,22 +87,26 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
               aria-label={`Delete "${step.title}"`}
               disabled={pending}
               onClick={() => startTransition(() => deleteStepAction(routineId, step.id))}
-              className="h-11 w-11 shrink-0 rounded-xl text-ink-soft hover:bg-blush"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink-faint"
             >
-              ✕
+              <X size={16} />
             </button>
           </li>
         ))}
       </ol>
 
-      <form onSubmit={add} className="flex items-center gap-2 rounded-2xl border-2 border-dashed border-line p-3">
+      <form
+        onSubmit={add}
+        className="flex items-center gap-2 rounded-[20px] border-2 border-dashed p-3"
+        style={{ borderColor: 'var(--dashed)' }}
+      >
         <input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Add a tiny step…"
           maxLength={120}
           aria-label="New step title"
-          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-lg outline-none"
+          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15.5px] outline-none placeholder:text-ink-faint"
         />
         <input
           type="number"
@@ -112,11 +116,11 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
           onChange={(e) => setNewTimer(e.target.value)}
           placeholder="min"
           aria-label="Timer minutes (optional)"
-          className="w-16 rounded-xl border border-line bg-card px-2 py-2 text-center outline-none"
+          className="w-16 rounded-xl bg-surface-tint px-2 py-2 text-center outline-none placeholder:text-ink-faint"
         />
         <button
           disabled={pending || !newTitle.trim()}
-          className="h-11 shrink-0 rounded-full bg-ink px-5 font-semibold text-on-ink disabled:opacity-40"
+          className="h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-bold text-on-primary disabled:opacity-40"
         >
           Add
         </button>

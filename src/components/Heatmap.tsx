@@ -1,34 +1,24 @@
-// Calendar heatmap — one column per week, GitHub-contribution style,
-// rendered server-side from core/stats data.
+// 45-day heatmap: 15 columns of small rounded cells, filled = completed.
+// Rendered server-side.
 
-import type { HeatmapCell } from '@/core/stats';
+import type { LocalDate } from '@/core/types';
 
-const CELL_COLORS: Record<HeatmapCell['level'], string> = {
-  0: 'var(--paper)', // not scheduled
-  1: 'var(--line)', // scheduled, not done
-  2: 'var(--sky-deep)', // completed
-};
+export interface DayCell {
+  date: LocalDate;
+  filled: boolean;
+}
 
-export function Heatmap({ columns }: { columns: HeatmapCell[][] }) {
+export function Heatmap({ cells }: { cells: DayCell[] }) {
   return (
-    <div className="overflow-x-auto pb-1" aria-label="Completion calendar">
-      <div className="flex gap-1">
-        {columns.map((week, i) => (
-          <div key={i} className="flex flex-col gap-1">
-            {week.map((cell) => (
-              <div
-                key={cell.date}
-                title={cell.date}
-                className="h-3.5 w-3.5 rounded-[4px]"
-                style={{
-                  background: cell.inFuture ? 'transparent' : CELL_COLORS[cell.level],
-                  border: cell.inFuture ? '1px dashed var(--line)' : 'none',
-                }}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
+    <div className="grid grid-cols-15 gap-1" aria-label="Last 45 days" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+      {cells.map((cell) => (
+        <div
+          key={cell.date}
+          title={cell.date}
+          className="aspect-square rounded-[5px]"
+          style={{ background: cell.filled ? 'var(--primary)' : 'var(--chart-idle)' }}
+        />
+      ))}
     </div>
   );
 }

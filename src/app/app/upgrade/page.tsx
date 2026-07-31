@@ -20,9 +20,9 @@ export default async function UpgradePage() {
   if (premium) {
     return (
       <main className="flex flex-col gap-6">
-        <h1 className="px-1 text-3xl font-semibold tracking-tight">Premium</h1>
-        <div className="rounded-card bg-mint p-8 text-center">
-          <p className="text-5xl" aria-hidden>💛</p>
+        <h1 className="px-1 text-[26px] font-bold tracking-[-0.01em]">Premium</h1>
+        <div className="shadow-card rounded-card bg-card p-8 text-center">
+          
           <h2 className="mt-4 text-2xl font-semibold">You&apos;re on Premium</h2>
           <p className="mt-2 text-ink-soft">
             Unlimited routines, themes, full stats and backup are unlocked.
@@ -38,7 +38,7 @@ export default async function UpgradePage() {
   return (
     <main className="flex flex-col gap-6">
       <header className="px-1">
-        <h1 className="text-3xl font-semibold tracking-tight">Go Premium</h1>
+        <h1 className="text-[26px] font-bold tracking-[-0.01em]">Go Premium</h1>
         <p className="mt-2 text-ink-soft">
           Unlimited routines · calm themes · full stats · backup
         </p>
@@ -47,20 +47,20 @@ export default async function UpgradePage() {
       <div className="grid grid-cols-1 gap-4">
         <a
           href={provider.checkoutUrl('yearly', me)}
-          className="rounded-card bg-ink p-6 text-on-ink transition-transform active:scale-[0.98]"
+          className="rounded-card bg-primary p-6 text-on-primary transition-transform active:scale-[0.98]"
         >
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-semibold">{PRICING.yearly.label}</span>
-            <span className="rounded-full bg-sky px-3 py-1 text-sm font-semibold text-ink">
+            <span className="rounded-full bg-accent px-3 py-1 text-sm font-bold text-accent-ink">
               2 months free
             </span>
           </div>
-          <p className="mt-2 text-on-ink/70">Billed once a year via Whop.</p>
+          <p className="mt-2 text-on-primary/70">Billed once a year via Whop.</p>
         </a>
 
         <a
           href={provider.checkoutUrl('monthly', me)}
-          className="rounded-card bg-card p-6 transition-transform active:scale-[0.98]"
+          className="shadow-card rounded-card bg-card p-6 transition-transform active:scale-[0.98]"
         >
           <span className="text-2xl font-semibold">{PRICING.monthly.label}</span>
           <p className="mt-2 text-ink-soft">Cancel anytime via Whop.</p>
@@ -69,7 +69,7 @@ export default async function UpgradePage() {
 
       <VerifyPremiumButton />
 
-      <ul className="rounded-card flex flex-col gap-3 bg-card p-6 text-lg">
+      <ul className="shadow-card rounded-card flex flex-col gap-3 bg-card p-6 text-[15px] font-medium">
         <li>✓ Unlimited routines (free plan holds 3)</li>
         <li>✓ Themes: Dusk & Meadow</li>
         <li>✓ Completion rate + calendar heatmap</li>

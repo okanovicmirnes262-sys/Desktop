@@ -1,50 +1,50 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
-import { getProfile } from '@/lib/db';
+import { BarChart2, Home, Plus, Settings, Snowflake } from 'lucide-react';
 
-// Authenticated shell: content + a fixed 3-item bottom nav. Deliberately
-// minimal — one list, one stats view, one settings view.
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Premium themes are applied via a data attribute on the shell.
-  let theme = 'default';
-  if (user) {
-    try {
-      theme = (await getProfile(supabase, user.id)).theme;
-    } catch {
-      // profile row may lag right after signup — default theme is fine
-    }
-  }
-
+// Authenticated shell: content + the floating pill tab bar with the
+// always-available yellow "add a routine" FAB in the middle.
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div data-theme={theme} className="flex min-h-screen flex-col bg-paper">
-      <div className="mx-auto w-full max-w-md flex-1 px-5 pb-28 pt-6">{children}</div>
+    <div className="flex min-h-screen flex-col">
+      <div className="mx-auto w-full max-w-md flex-1 px-[26px] pb-32 pt-6">{children}</div>
 
-      <nav
-        aria-label="Main"
-        className="fixed inset-x-0 bottom-0 border-t border-line bg-card/95 backdrop-blur"
-      >
-        <div className="mx-auto flex max-w-md items-stretch justify-around">
-          {[
-            { href: '/app', label: 'Today', icon: '☀️' },
-            { href: '/app/stats', label: 'Stats', icon: '📈' },
-            { href: '/app/settings', label: 'Settings', icon: '⚙️' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex min-w-24 flex-col items-center gap-0.5 px-4 py-3 text-xs font-medium text-ink-soft"
-            >
-              <span className="text-xl" aria-hidden>
-                {item.icon}
-              </span>
-              {item.label}
-            </Link>
-          ))}
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-4 px-[22px]">
+        <div className="shadow-bar mx-auto flex max-w-md items-center justify-between rounded-[28px] bg-card px-5 py-3">
+          <Link
+            href="/app"
+            className="flex min-w-14 flex-col items-center gap-1 text-primary"
+          >
+            <Home size={19} strokeWidth={2} />
+            <span className="text-[9.5px] font-semibold uppercase tracking-[0.08em]">Today</span>
+          </Link>
+          <Link
+            href="/app/stats"
+            className="flex min-w-14 flex-col items-center gap-1 text-ink-faint"
+          >
+            <BarChart2 size={19} strokeWidth={2} />
+            <span className="text-[9.5px] font-semibold uppercase tracking-[0.08em]">Stats</span>
+          </Link>
+          <Link
+            href="/app/routines/new"
+            aria-label="Add a routine"
+            className="shadow-fab flex h-[54px] w-[54px] items-center justify-center rounded-full bg-accent text-accent-ink transition-transform active:scale-95"
+          >
+            <Plus size={24} strokeWidth={2.5} />
+          </Link>
+          <Link
+            href="/app/freezes"
+            className="flex min-w-14 flex-col items-center gap-1 text-ink-faint"
+          >
+            <Snowflake size={19} strokeWidth={2} />
+            <span className="text-[9.5px] font-semibold uppercase tracking-[0.08em]">Freezes</span>
+          </Link>
+          <Link
+            href="/app/settings"
+            className="flex min-w-14 flex-col items-center gap-1 text-ink-faint"
+          >
+            <Settings size={19} strokeWidth={2} />
+            <span className="text-[9.5px] font-semibold uppercase tracking-[0.08em]">More</span>
+          </Link>
         </div>
       </nav>
     </div>

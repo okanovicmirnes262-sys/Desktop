@@ -49,7 +49,7 @@ function LoginForm() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-6 py-12">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-[26px] font-bold tracking-[-0.01em]">
           {mode === 'signin' ? 'Welcome back' : 'Create your account'}
         </h1>
         <p className="mt-2 text-ink-soft">
@@ -61,7 +61,7 @@ function LoginForm() {
 
       <button
         onClick={google}
-        className="flex items-center justify-center gap-3 rounded-full border border-line bg-card px-6 py-4 text-lg font-medium transition-transform active:scale-95"
+        className="flex items-center justify-center gap-3 shadow-card rounded-[20px] bg-card px-6 py-4 text-[15.5px] font-semibold transition-transform active:scale-[0.98]"
       >
         {/* Google "G" */}
         <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden>
@@ -88,7 +88,7 @@ function LoginForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-2xl border border-line bg-card px-5 py-4 text-lg outline-none focus:border-sky-deep"
+            className="shadow-card rounded-[20px] bg-card px-5 py-4 text-[17px] outline-none"
           />
         </label>
         <label className="flex flex-col gap-1.5">
@@ -100,17 +100,17 @@ function LoginForm() {
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded-2xl border border-line bg-card px-5 py-4 text-lg outline-none focus:border-sky-deep"
+            className="shadow-card rounded-[20px] bg-card px-5 py-4 text-[17px] outline-none"
           />
         </label>
 
         {error && (
-          <p role="alert" className="rounded-2xl bg-blush px-5 py-3 text-sm font-medium">
+          <p role="alert" className="rounded-[20px] bg-blush px-5 py-3 text-sm font-semibold">
             {error}
           </p>
         )}
         {notice && (
-          <p role="status" className="rounded-2xl bg-mint px-5 py-3 text-sm font-medium">
+          <p role="status" className="rounded-[20px] bg-mint px-5 py-3 text-sm font-semibold">
             {notice}
           </p>
         )}
@@ -118,7 +118,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95 disabled:opacity-50"
+          className="rounded-[22px] bg-primary px-8 py-[18px] text-[17px] font-bold text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-45"
         >
           {busy ? 'One sec…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
         </button>

@@ -1,41 +1,102 @@
 'use client';
 
-// Small client controls used on the Settings page.
+// Client controls for the Settings screen: pill toggles, the appearance
+// segmented control, and the timezone sync helper.
 
 import { useState, useSyncExternalStore, useTransition } from 'react';
-import {
-  updateThemeAction,
-  updateTimezoneAction,
-  updateWeeklyEmailAction,
-} from '@/lib/actions';
+import { updateTimezoneAction, updateWeeklyEmailAction } from '@/lib/actions';
+import { SOUND_PREF_KEY } from '@/components/RunPlayer';
 
-/** Weekly summary email on/off (account-wide preference). */
-export function WeeklyEmailToggle({ initial }: { initial: boolean }) {
-  const [on, setOn] = useState(initial);
-  const [pending, startTransition] = useTransition();
-
+/** 50×30 pill toggle from the design system. */
+export function Toggle({
+  on,
+  disabled,
+  onChange,
+  label,
+}: {
+  on: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
   return (
     <button
       role="switch"
       aria-checked={on}
-      disabled={pending}
-      onClick={() => {
-        const next = !on;
-        setOn(next);
-        startTransition(() => updateWeeklyEmailAction(next));
-      }}
-      className={`w-full rounded-full px-6 py-4 text-lg font-semibold transition-transform active:scale-95 disabled:opacity-50 ${
-        on ? 'bg-mint' : 'bg-paper text-ink-soft'
-      }`}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      className="relative h-[30px] w-[50px] shrink-0 rounded-full p-[3px] transition-colors disabled:opacity-50"
+      style={{ background: on ? 'var(--primary)' : '#dcd9f2' }}
     >
-      {on ? 'Weekly summary email on ✉️ (tap to turn off)' : 'Weekly summary email off'}
+      <span
+        className="block h-6 w-6 rounded-full bg-white transition-transform duration-150"
+        style={{ transform: on ? 'translateX(20px)' : 'translateX(0)' }}
+      />
     </button>
   );
 }
-import { SOUND_PREF_KEY } from '@/components/RunPlayer';
 
-// Tiny external store around localStorage so the toggle reads/writes the
-// device preference without effect-driven state (and stays SSR-safe).
+// ---- appearance (light / dark / system) -----------------------------------
+
+type Appearance = 'light' | 'dark' | 'system';
+
+const appearanceListeners = new Set<() => void>();
+const appearanceStore = {
+  subscribe(cb: () => void) {
+    appearanceListeners.add(cb);
+    return () => appearanceListeners.delete(cb);
+  },
+  get: (): Appearance => {
+    const v = localStorage.getItem('ts-appearance');
+    return v === 'light' || v === 'dark' ? v : 'system';
+  },
+  getServer: (): Appearance => 'system',
+  set(value: Appearance) {
+    if (value === 'system') {
+      localStorage.removeItem('ts-appearance');
+      delete document.documentElement.dataset.appearance;
+    } else {
+      localStorage.setItem('ts-appearance', value);
+      document.documentElement.dataset.appearance = value;
+    }
+    appearanceListeners.forEach((cb) => cb());
+  },
+};
+
+export function AppearanceControl() {
+  const value = useSyncExternalStore(
+    appearanceStore.subscribe,
+    appearanceStore.get,
+    appearanceStore.getServer,
+  );
+  const options: { key: Appearance; label: string }[] = [
+    { key: 'light', label: 'Light' },
+    { key: 'dark', label: 'Dark' },
+    { key: 'system', label: 'System' },
+  ];
+  return (
+    <div className="flex rounded-2xl bg-surface-tint p-1" role="radiogroup" aria-label="Appearance">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          role="radio"
+          aria-checked={value === o.key}
+          onClick={() => appearanceStore.set(o.key)}
+          className={`flex-1 rounded-[13px] py-2 text-sm font-semibold transition-colors ${
+            value === o.key ? 'bg-card text-ink' : 'text-ink-faint'
+          }`}
+          style={value === o.key ? { boxShadow: '0 3px 8px rgba(42,39,96,.1)' } : undefined}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---- sound ---------------------------------------------------------------
+
 const soundListeners = new Set<() => void>();
 const soundStore = {
   subscribe(cb: () => void) {
@@ -50,78 +111,46 @@ const soundStore = {
   },
 };
 
-/** Celebration sound on/off — a device preference, stored locally. */
 export function SoundToggle() {
   const on = useSyncExternalStore(soundStore.subscribe, soundStore.get, soundStore.getServer);
+  return <Toggle on={on} onChange={(next) => soundStore.set(next)} label="Celebration sound" />;
+}
 
+// ---- weekly email ---------------------------------------------------------
+
+export function WeeklyEmailToggle({ initial }: { initial: boolean }) {
+  const [on, setOn] = useState(initial);
+  const [pending, startTransition] = useTransition();
   return (
-    <button
-      role="switch"
-      aria-checked={on}
-      onClick={() => soundStore.set(!on)}
-      className={`w-full rounded-full px-6 py-4 text-lg font-semibold transition-transform active:scale-95 ${
-        on ? 'bg-mint' : 'bg-paper text-ink-soft'
-      }`}
-    >
-      {on ? 'Celebration sound on 🔔 (tap to mute)' : 'Celebration sound off 🔕'}
-    </button>
+    <Toggle
+      on={on}
+      disabled={pending}
+      label="Weekly summary email"
+      onChange={(next) => {
+        setOn(next);
+        startTransition(() => updateWeeklyEmailAction(next));
+      }}
+    />
   );
 }
+
+// ---- timezone -------------------------------------------------------------
 
 export function TimezoneSync({ current }: { current: string }) {
   const [pending, startTransition] = useTransition();
   const device = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const matches = device === current;
 
+  if (matches) {
+    return <p className="text-xs text-ink-soft">Streak days and reminders use {current}.</p>;
+  }
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm text-ink-soft">
-        Streak days and reminders use <strong>{current}</strong>.
-      </p>
-      {!matches && (
-        <button
-          disabled={pending}
-          onClick={() => startTransition(() => updateTimezoneAction(device))}
-          className="rounded-full bg-sky px-6 py-3 font-semibold transition-transform active:scale-95 disabled:opacity-50"
-        >
-          {pending ? 'Saving…' : `Switch to this device's timezone (${device})`}
-        </button>
-      )}
-    </div>
-  );
-}
-
-const THEMES = [
-  { key: 'default', label: 'Paper', swatch: '#bfdff2' },
-  { key: 'dusk', label: 'Dusk', swatch: '#ccc7ee' },
-  { key: 'meadow', label: 'Meadow', swatch: '#cfe8c9' },
-];
-
-export function ThemePicker({ current, premium }: { current: string; premium: boolean }) {
-  const [pending, startTransition] = useTransition();
-
-  return (
-    <div className="flex gap-3">
-      {THEMES.map((t) => {
-        const locked = t.key !== 'default' && !premium;
-        return (
-          <button
-            key={t.key}
-            disabled={pending || locked}
-            aria-pressed={current === t.key}
-            onClick={() => startTransition(() => updateThemeAction(t.key))}
-            className={`flex flex-1 flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-transform active:scale-95 ${
-              current === t.key ? 'border-ink' : 'border-line'
-            } ${locked ? 'opacity-50' : ''}`}
-          >
-            <span className="h-8 w-8 rounded-full" style={{ background: t.swatch }} />
-            <span className="text-sm font-medium">
-              {t.label}
-              {locked ? ' 🔒' : ''}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <button
+      disabled={pending}
+      onClick={() => startTransition(() => updateTimezoneAction(device))}
+      className="rounded-full bg-surface-alt px-5 py-2.5 text-sm font-semibold text-primary disabled:opacity-50"
+    >
+      {pending ? 'Saving…' : `Switch to this device's timezone (${device})`}
+    </button>
   );
 }

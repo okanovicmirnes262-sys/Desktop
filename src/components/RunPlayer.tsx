@@ -1,13 +1,13 @@
 'use client';
 
-// The routine player: exactly one step on screen, one primary action.
-// Timers: a step with its own timer gets the big ring; otherwise a
-// whole-routine timer (if set) stays visible so time keeps feeling real.
-// Progress persists server-side after every step, so a half-done routine
-// can resume after a reload or on another device.
+// The routine player — a focused dark screen, one step at a time.
+// Header shows routine + step position, segment bars track progress,
+// the accent Done button advances, and completion lands on a calm
+// milestone-style screen (no confetti, no emoji).
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Snowflake } from 'lucide-react';
 import type { Routine, Step } from '@/core/types';
 import { TimerRing } from '@/components/TimerRing';
 import {
@@ -18,8 +18,7 @@ import {
 
 export const SOUND_PREF_KEY = 'tinysteps-sound';
 
-/** Soft two-note chime via WebAudio — no asset files, respects the
- *  user's sound preference (Settings). */
+/** Soft two-note chime via WebAudio — respects the Settings preference. */
 function playChime() {
   try {
     if (localStorage.getItem(SOUND_PREF_KEY) === 'off') return;
@@ -42,42 +41,18 @@ function playChime() {
   }
 }
 
-const CONFETTI_COLORS = ['var(--sky-deep)', 'var(--mint)', 'var(--blush)', 'var(--butter)'];
+const MILESTONE_WORDS: Record<number, string> = {
+  7: 'Seven days.',
+  30: 'Thirty days.',
+  100: 'One hundred days.',
+};
 
-/** Deterministic 0–1 "random" so rendering stays pure (React lint rule). */
-function pseudoRandom(seed: number) {
-  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-function Confetti({ count = 28 }: { count?: number }) {
-  // Deterministic scatter; reduced-motion users get none (CSS kills it).
-  const pieces = useMemo(
-    () =>
-      Array.from({ length: count }, (_, i) => ({
-        left: `${pseudoRandom(i + 1) * 100}%`,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-        delay: `${pseudoRandom(i + 100) * 0.6}s`,
-        duration: `${2 + pseudoRandom(i + 200) * 1.6}s`,
-      })),
-    [count],
-  );
-  return (
-    <div aria-hidden>
-      {pieces.map((p, i) => (
-        <span
-          key={i}
-          className="ts-confetti-piece"
-          style={{
-            left: p.left,
-            background: p.color,
-            ['--fall-delay' as string]: p.delay,
-            ['--fall-duration' as string]: p.duration,
-          }}
-        />
-      ))}
-    </div>
-  );
+function share(text: string) {
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => undefined);
+  } else {
+    navigator.clipboard?.writeText(text).catch(() => undefined);
+  }
 }
 
 export function RunPlayer({
@@ -96,6 +71,7 @@ export function RunPlayer({
   const [index, setIndex] = useState(0);
   const [resumePrompt, setResumePrompt] = useState(canResume && !solo);
   const [soloPause, setSoloPause] = useState(false);
+  const [running, setRunning] = useState(true);
   const [finishing, setFinishing] = useState(false);
   const [celebration, setCelebration] = useState<CompletionCelebration | null>(null);
   // Routine-level timer keeps running across steps; mounted once.
@@ -106,6 +82,7 @@ export function RunPlayer({
 
   function goTo(next: number) {
     setIndex(next);
+    setRunning(true);
     void saveRunProgressAction(routine.id, next); // fire-and-forget
   }
 
@@ -113,7 +90,6 @@ export function RunPlayer({
     navigator.vibrate?.(12); // subtle tap feedback where supported
     if (index + 1 < steps.length) {
       goTo(index + 1);
-      // Solo mode: after the very first step, that's already a win.
       if (solo && index === 0) setSoloPause(true);
       return;
     }
@@ -128,112 +104,136 @@ export function RunPlayer({
     }
   }
 
+  // ---- completion / milestone screen (always the indigo radial) ----------
   if (celebration) {
     const milestone = celebration.milestone;
+    const headline = milestone
+      ? (MILESTONE_WORDS[milestone] ?? `${milestone} days.`)
+      : 'Routine done.';
     return (
-      <div className="ts-pop flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <Confetti count={milestone ? 64 : 28} />
-        <div className={`rounded-card w-full p-8 ${milestone ? 'bg-butter' : 'bg-mint'}`}>
-          <p className="text-6xl" aria-hidden>
-            {milestone ? '🏆' : '🎉'}
-          </p>
-          <h1 className="mt-4 text-3xl font-semibold">
-            {milestone ? `${milestone} days!` : 'Routine done'}
-          </h1>
-          {milestone ? (
-            <p className="mt-3 text-xl">
-              A {milestone}-day streak. That&apos;s not luck — that&apos;s you, showing up.
-            </p>
-          ) : (
-            <p className="mt-3 text-xl">
-              🔥 {celebration.currentStreak}-day streak
-              {celebration.currentStreak >= celebration.bestStreak && celebration.currentStreak > 1
-                ? ' — your best yet'
-                : ''}
-            </p>
-          )}
-          {celebration.freezeEarned && (
-            <p className="mt-3 rounded-full bg-card px-4 py-2 font-medium">
-              🧊 You earned a streak freeze ({celebration.freezeBalance}/3 banked)
-            </p>
-          )}
-        </div>
-        <Link
-          href="/app"
-          className="w-full rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95"
+      <div className="ts-milestone-screen ts-pop fixed inset-0 z-40 flex flex-col items-center justify-center gap-7 px-[26px] text-center">
+        <div
+          className="flex h-[200px] w-[200px] items-center justify-center rounded-full"
+          style={{ background: 'rgba(255,255,255,0.14)' }}
         >
-          Back to Today
-        </Link>
+          <div className="ts-milestone-num flex h-[152px] w-[152px] items-center justify-center rounded-full bg-accent">
+            <span className="text-[60px] font-extrabold leading-none text-accent-ink">
+              {celebration.currentStreak}
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <h1 className="text-[29px] font-bold">{headline}</h1>
+          <p className="mx-auto mt-2 max-w-72 text-[13.5px] leading-relaxed text-white/75">
+            {milestone
+              ? "That's not luck — that's you, showing up. One tiny step at a time."
+              : celebration.currentStreak > 1
+                ? `${celebration.currentStreak} days in a row${
+                    celebration.currentStreak >= celebration.bestStreak ? ' — your best yet.' : '.'
+                  }`
+                : 'One tiny step at a time.'}
+          </p>
+        </div>
+
+        {celebration.freezeEarned && (
+          <p
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em]"
+            style={{ background: 'rgba(255,255,255,0.16)' }}
+          >
+            <Snowflake size={14} strokeWidth={2} />
+            Freeze earned · {celebration.freezeBalance} of 3
+          </p>
+        )}
+
+        <div className="flex w-full flex-col items-center gap-3">
+          <Link
+            href="/app"
+            className="w-full rounded-[22px] bg-white px-8 py-[18px] text-[17px] font-bold text-[#2a2760] transition-transform active:scale-[0.97]"
+          >
+            Back to today
+          </Link>
+          <button
+            onClick={() =>
+              share(
+                `${celebration.currentStreak}-day streak on "${routine.name}" — one tiny step at a time.`,
+              )
+            }
+            className="py-1 text-[13px] font-semibold text-white/70"
+          >
+            Share this
+          </button>
+        </div>
       </div>
     );
   }
 
+  // ---- solo-mode interstitial --------------------------------------------
   if (soloPause) {
     return (
-      <div className="ts-pop flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <div className="rounded-card w-full bg-mint p-8">
-          <p className="text-5xl" aria-hidden>
-            🐣
-          </p>
-          <h1 className="mt-4 text-2xl font-semibold">That&apos;s a win.</h1>
-          <p className="mt-2">
+      <div className="ts-run-screen ts-pop fixed inset-0 z-40 flex flex-col items-center justify-center gap-7 px-[26px] text-center">
+        <div>
+          <h1 className="text-[29px] font-bold">That&apos;s a win.</h1>
+          <p className="mx-auto mt-2 max-w-72 text-[13.5px] leading-relaxed text-[#a9a5d8]">
             One step done. Sometimes that&apos;s all it takes to get rolling.
           </p>
         </div>
-        <button
-          onClick={() => setSoloPause(false)}
-          className="w-full rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95"
-        >
-          Keep going
-        </button>
-        <Link href="/app" className="py-2 text-ink-soft underline underline-offset-4">
-          Done for now — progress is saved
-        </Link>
+        <div className="flex w-full flex-col items-center gap-3">
+          <button
+            onClick={() => setSoloPause(false)}
+            className="w-full rounded-[22px] bg-accent px-8 py-[18px] text-[17px] font-bold text-[#2a2760] transition-transform active:scale-[0.97]"
+          >
+            Keep going
+          </button>
+          <Link href="/app" className="py-1 text-[13px] font-semibold text-white/70">
+            Done for now — progress is saved
+          </Link>
+        </div>
       </div>
     );
   }
 
+  // ---- resume prompt ------------------------------------------------------
   if (resumePrompt) {
     return (
-      <div className="ts-pop flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <div className="rounded-card w-full bg-sky p-8">
-          <p className="text-5xl" aria-hidden>
-            👣
-          </p>
-          <h1 className="mt-4 text-2xl font-semibold">Pick up where you left off?</h1>
-          <p className="mt-2">
+      <div className="ts-run-screen ts-pop fixed inset-0 z-40 flex flex-col items-center justify-center gap-7 px-[26px] text-center">
+        <div>
+          <h1 className="text-[29px] font-bold">Pick up where you left off?</h1>
+          <p className="mt-2 text-[13.5px] text-[#a9a5d8]">
             You were on step {initialStepIndex + 1} of {steps.length}.
           </p>
         </div>
-        <button
-          onClick={() => {
-            setIndex(initialStepIndex);
-            setResumePrompt(false);
-          }}
-          className="w-full rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95"
-        >
-          Continue
-        </button>
-        <button
-          onClick={() => {
-            goTo(0);
-            setResumePrompt(false);
-          }}
-          className="py-2 text-ink-soft underline underline-offset-4"
-        >
-          Start over
-        </button>
+        <div className="flex w-full flex-col items-center gap-3">
+          <button
+            onClick={() => {
+              setIndex(initialStepIndex);
+              setResumePrompt(false);
+            }}
+            className="w-full rounded-[22px] bg-accent px-8 py-[18px] text-[17px] font-bold text-[#2a2760] transition-transform active:scale-[0.97]"
+          >
+            Continue
+          </button>
+          <button
+            onClick={() => {
+              goTo(0);
+              setResumePrompt(false);
+            }}
+            className="py-1 text-[13px] font-semibold text-white/70"
+          >
+            Start over
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!step) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <p className="text-lg text-ink-soft">This routine has no steps yet.</p>
+      <div className="ts-run-screen fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 px-[26px] text-center">
+        <p className="text-[15px] text-[#a9a5d8]">This routine has no steps yet.</p>
         <Link
           href={`/app/routines/${routine.id}`}
-          className="rounded-full bg-ink px-8 py-4 font-semibold text-on-ink"
+          className="rounded-[22px] bg-accent px-8 py-4 font-bold text-[#2a2760]"
         >
           Add steps
         </Link>
@@ -241,59 +241,72 @@ export function RunPlayer({
     );
   }
 
+  // ---- the run screen -----------------------------------------------------
   return (
-    <div className="flex flex-1 flex-col">
-      {/* Progress dots — where you are without a wall of remaining tasks. */}
-      <div className="flex justify-center gap-2 py-4" aria-label={`Step ${index + 1} of ${steps.length}`}>
+    <div className="ts-run-screen fixed inset-0 z-40 flex flex-col px-[26px] py-8">
+      <header className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a9a5d8]">
+        <span className="truncate">{routine.name}</span>
+        <span className="shrink-0">
+          Step {index + 1} of {steps.length}
+        </span>
+      </header>
+
+      {/* Step segments. */}
+      <div className="mt-4 flex gap-1.5" aria-hidden>
         {steps.map((s, i) => (
           <span
             key={s.id}
-            className={`h-2.5 rounded-full transition-all ${
-              i < index ? 'w-2.5 bg-sky-deep' : i === index ? 'w-8 bg-ink' : 'w-2.5 bg-line'
-            }`}
+            className="h-[5px] flex-1 rounded-full"
+            style={{ background: i <= index ? 'var(--accent)' : 'rgba(255,255,255,0.18)' }}
           />
         ))}
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-8 text-center">
-        {/* Step timer (per-step) or the continuing routine timer. */}
         {stepHasTimer && (
           // Keyed by step id → each step's timer starts fresh on remount.
-          <TimerRing key={step.id} totalSeconds={step.timerSeconds!} running />
+          <TimerRing
+            key={step.id}
+            totalSeconds={step.timerSeconds!}
+            running={running}
+            onToggle={() => setRunning((r) => !r)}
+          />
         )}
-        {routineTimer && (
-          // Mounted once for the whole run so it keeps counting across steps.
-          <div className={stepHasTimer ? 'hidden' : ''}>
-            <TimerRing totalSeconds={routineTimer} running />
-          </div>
+        {!stepHasTimer && routineTimer && (
+          <TimerRing
+            totalSeconds={routineTimer}
+            running={running}
+            onToggle={() => setRunning((r) => !r)}
+          />
         )}
 
-        {/* Keyed by index so each step slides in gently. */}
-        <h1
-          key={index}
-          className="ts-step-in text-balance px-2 text-4xl font-semibold leading-tight tracking-tight"
-        >
-          {step.title}
-        </h1>
+        <div key={index} className="ts-step-in">
+          <h1 className="text-balance px-2 text-[30px] font-bold leading-tight">{step.title}</h1>
+          {(stepHasTimer || routineTimer) && (
+            <p className="mt-2 text-[13.5px] text-[#a9a5d8]">
+              {running ? 'Running — tap the ring to pause' : 'Paused — tap the ring to resume'}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-col gap-3 pb-4">
+      <div className="flex flex-col gap-4 pb-2">
         <button
           onClick={advance}
           disabled={finishing}
-          className="w-full rounded-full bg-ink py-6 text-2xl font-semibold text-on-ink transition-transform active:scale-95 disabled:opacity-50"
+          className="w-full rounded-[22px] bg-accent py-[18px] text-[19px] font-bold text-[#2a2760] transition-transform active:scale-[0.97] disabled:opacity-50"
         >
-          {finishing ? 'Saving…' : index + 1 === steps.length ? 'Done — finish' : 'Done'}
+          {finishing ? 'Saving…' : 'Done'}
         </button>
-        <div className="flex justify-between px-2 text-ink-soft">
-          <Link href="/app" className="py-2 underline underline-offset-4">
-            Exit
-          </Link>
+        <div className="flex items-center justify-center gap-7 text-[13px] font-semibold text-white/70">
           {index + 1 < steps.length && (
-            <button onClick={() => goTo(index + 1)} className="py-2 underline underline-offset-4">
+            <button onClick={() => goTo(index + 1)} className="py-1">
               Skip this step
             </button>
           )}
+          <Link href="/app" className="py-1">
+            Exit
+          </Link>
         </div>
       </div>
     </div>

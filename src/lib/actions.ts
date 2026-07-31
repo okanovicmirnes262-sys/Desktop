@@ -209,33 +209,27 @@ export async function saveRunProgressAction(routineId: string, stepIndex: number
 
 // ---- onboarding seed ------------------------------------------------------
 
-export async function seedExampleRoutinesAction() {
+/** One-tap "Use" on a template row: seeds that single routine. */
+export async function seedTemplateAction(templateName: string) {
   const { supabase, user } = await requireUser();
+  const seed = SEED_ROUTINES.find((s) => s.name === templateName);
+  if (!seed) return;
   const existing = await db.listRoutines(supabase, user.id);
-  if (existing.length === 0) {
-    for (const [i, seed] of SEED_ROUTINES.entries()) {
-      const routine = await db.createRoutine(supabase, user.id, {
-        name: seed.name,
-        emoji: seed.emoji,
-        scheduleDays: seed.scheduleDays,
-        reminderTime: seed.reminderTime,
-        position: i,
-      });
-      for (const [j, step] of seed.steps.entries()) {
-        await db.createStep(supabase, user.id, routine.id, {
-          title: step.title,
-          position: j,
-          timerSeconds: step.timerSeconds,
-        });
-      }
-    }
+  if (existing.some((r) => r.name === seed.name)) return; // already added
+  const routine = await db.createRoutine(supabase, user.id, {
+    name: seed.name,
+    emoji: seed.icon, // legacy column now stores the icon key
+    scheduleDays: seed.scheduleDays,
+    reminderTime: seed.reminderTime,
+    position: existing.length,
+  });
+  for (const [j, step] of seed.steps.entries()) {
+    await db.createStep(supabase, user.id, routine.id, {
+      title: step.title,
+      position: j,
+      timerSeconds: step.timerSeconds,
+    });
   }
-  await db.updateProfile(supabase, user.id, { onboarded: true });
-  revalidatePath('/app');
-}
-
-export async function skipOnboardingAction() {
-  const { supabase, user } = await requireUser();
   await db.updateProfile(supabase, user.id, { onboarded: true });
   revalidatePath('/app');
 }

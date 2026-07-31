@@ -3,18 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
 import { addDays, todayInTz } from '@/core/dates';
 import { reconcile } from '@/core/streak';
-import { completionRate, heatmapData } from '@/core/stats';
+import { completionRate } from '@/core/stats';
 import { canUseFeature } from '@/core/entitlements';
-import { Heatmap } from '@/components/Heatmap';
+import { Heatmap, type DayCell } from '@/components/Heatmap';
 
-const BADGES = [
-  { at: 7, emoji: '🥉', label: '7-day streak' },
-  { at: 30, emoji: '🥈', label: '30-day streak' },
-  { at: 100, emoji: '🏆', label: '100-day streak' },
-];
-
-// Stats, deliberately small: streaks for everyone; rate + heatmap are
-// premium ("full stats"). All gating flows through canUseFeature/hasPremium.
+// Your progress: two KPIs, then one calm card per routine.
 export default async function StatsPage() {
   const supabase = await createClient();
   const {
@@ -29,9 +22,8 @@ export default async function StatsPage() {
   ]);
   const today = todayInTz(profile.timezone);
   const fullStats = canUseFeature('full_stats', sub);
-  const since = addDays(today, -120); // enough history for the heatmap
+  const since = addDays(today, -60);
 
-  // Bulk queries: 3 round trips total instead of 3 per routine.
   const ids = routines.map((r) => r.id);
   const [streaksMap, completionsMap, restMap] = await Promise.all([
     db.getStreaksBulk(supabase, ids),
@@ -43,79 +35,83 @@ export default async function StatsPage() {
     const stored = streaksMap.get(routine.id) ?? null;
     const completions = completionsMap.get(routine.id) ?? [];
     const restDays = restMap.get(routine.id) ?? new Set<string>();
+    const done = new Set(completions.map((c) => c.completedOn));
     const streak = stored ? reconcile(stored, today, restDays).state : null;
+
+    const cells: DayCell[] = [];
+    for (let i = 44; i >= 0; i--) {
+      const date = addDays(today, -i);
+      cells.push({ date, filled: done.has(date) });
+    }
     return {
       routine,
       streak,
+      cells,
       rate: completionRate(routine, completions, today, 30, restDays),
-      heatmap: heatmapData(routine, completions, today, 15, restDays),
+      doneLast30: Array.from(done).filter((d) => d >= addDays(today, -30)).length,
     };
   });
 
+  const bestCurrent = Math.max(0, ...rows.map((r) => r.streak?.currentStreak ?? 0));
+  const rates = rows.map((r) => r.rate).filter((r): r is number => r !== null);
+  const avgRate = rates.length ? Math.round((rates.reduce((a, b) => a + b, 0) / rates.length) * 100) : null;
+  const showedUp = new Set(
+    rows.flatMap((r) => r.cells.filter((c) => c.filled && c.date >= addDays(today, -30)).map((c) => c.date)),
+  ).size;
+
   return (
-    <main className="flex flex-col gap-5">
-      <h1 className="px-1 text-3xl font-semibold tracking-tight">Stats</h1>
+    <main className="flex flex-col gap-3.5">
+      <header className="px-0.5">
+        <h1 className="text-[26px] font-bold tracking-[-0.01em]">Your progress</h1>
+        <p className="mt-1 text-[13.5px] text-ink-soft">
+          Last 30 days · you showed up {showedUp} of them.
+        </p>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3.5">
+        <div
+          className="rounded-card bg-primary p-5 text-on-primary"
+          style={{ boxShadow: '0 14px 30px rgba(91,87,207,.25)' }}
+        >
+          <p className="text-[40px] font-extrabold leading-none">{bestCurrent}</p>
+          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] opacity-80">
+            Day streak
+          </p>
+        </div>
+        <div className="shadow-card rounded-card bg-card p-5">
+          <p className="text-[40px] font-extrabold leading-none">
+            {fullStats && avgRate !== null ? `${avgRate}%` : '—'}
+          </p>
+          <p className="ts-label mt-2">Completion</p>
+        </div>
+      </div>
 
       {rows.length === 0 && (
-        <p className="rounded-card bg-card p-6 text-center text-ink-soft">
+        <p className="shadow-card rounded-card bg-card p-6 text-center text-[13.5px] text-ink-soft">
           Stats show up once you have a routine.
         </p>
       )}
 
-      {rows.map(({ routine, streak, rate, heatmap }) => (
-        <section key={routine.id} className="rounded-card bg-card p-6">
-          <h2 className="text-xl font-semibold">
-            {routine.emoji} {routine.name}
-          </h2>
-
-          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-2xl bg-sky p-3">
-              <p className="text-2xl font-semibold tabular-nums">{streak?.currentStreak ?? 0}</p>
-              <p className="text-xs font-medium text-ink/70">Current streak</p>
-            </div>
-            <div className="rounded-2xl bg-mint p-3">
-              <p className="text-2xl font-semibold tabular-nums">{streak?.bestStreak ?? 0}</p>
-              <p className="text-xs font-medium text-ink/70">Best streak</p>
-            </div>
-            <div className="rounded-2xl bg-butter p-3">
-              <p className="text-2xl font-semibold tabular-nums">
-                {fullStats && rate !== null ? `${Math.round(rate * 100)}%` : '—'}
-              </p>
-              <p className="text-xs font-medium text-ink/70">30-day rate</p>
-            </div>
+      {rows.map(({ routine, streak, cells }) => (
+        <section key={routine.id} className="shadow-card rounded-card bg-card p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="truncate text-[17px] font-bold">{routine.name}</h2>
+            <p className="shrink-0 text-xs font-semibold text-ink-faint">
+              best {streak?.bestStreak ?? 0}
+              {streak && streak.freezeBalance > 0 ? ` · ${streak.freezeBalance} freezes` : ''}
+            </p>
           </div>
 
-          {/* Milestone badges — earned once via best streak, kept forever. */}
-          {streak && streak.bestStreak >= BADGES[0].at && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {BADGES.filter((b) => streak.bestStreak >= b.at).map((b) => (
-                <span
-                  key={b.at}
-                  className="rounded-full bg-paper px-3 py-1 text-sm font-medium"
-                  title={b.label}
-                >
-                  {b.emoji} {b.label}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {streak && streak.freezeBalance > 0 && (
-            <p className="mt-3 text-sm text-ink-soft">
-              🧊 {streak.freezeBalance} streak freeze{streak.freezeBalance === 1 ? '' : 's'} banked —
-              each protects one missed day.
-            </p>
-          )}
-
-          <div className="mt-5">
+          <div className="mt-4">
             {fullStats ? (
-              <Heatmap columns={heatmap} />
+              <Heatmap cells={cells} />
             ) : (
               <Link
                 href="/app/upgrade"
-                className="block rounded-2xl border-2 border-dashed border-line p-4 text-center text-sm font-medium text-ink-soft"
+                className="block rounded-2xl border-2 border-dashed p-4 text-center text-xs font-semibold text-ink-faint"
+                style={{ borderColor: 'var(--dashed)' }}
               >
-                Calendar heatmap + completion rate are Premium →
+                Heatmap + completion rate are Premium →
               </Link>
             )}
           </div>

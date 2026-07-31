@@ -1,9 +1,10 @@
 'use client';
 
-// Settings toggle for push reminders on this device: registers the
-// service worker, asks permission, stores the subscription server-side.
+// Push-reminder toggle for this device: registers the service worker,
+// asks permission, stores the subscription server-side.
 
 import { useEffect, useState } from 'react';
+import { Toggle } from '@/components/SettingsControls';
 
 type PushState = 'unsupported' | 'off' | 'on' | 'denied' | 'busy';
 
@@ -43,9 +44,7 @@ export function PushManager() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-        ),
+        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
       });
       await fetch('/api/push/subscribe', {
         method: 'POST',
@@ -74,29 +73,17 @@ export function PushManager() {
   }
 
   if (state === 'unsupported') {
-    return <p className="text-sm text-ink-soft">Push isn&apos;t supported in this browser.</p>;
+    return <p className="text-xs text-ink-soft">Not supported in this browser.</p>;
   }
   if (state === 'denied') {
-    return (
-      <p className="text-sm text-ink-soft">
-        Notifications are blocked for this site — allow them in your browser settings to get
-        reminders.
-      </p>
-    );
+    return <p className="text-xs text-ink-soft">Blocked — allow notifications in browser settings.</p>;
   }
   return (
-    <button
-      onClick={state === 'on' ? disable : enable}
+    <Toggle
+      on={state === 'on'}
       disabled={state === 'busy'}
-      className={`w-full rounded-full px-6 py-4 text-lg font-semibold transition-transform active:scale-95 disabled:opacity-50 ${
-        state === 'on' ? 'bg-mint' : 'bg-ink text-on-ink'
-      }`}
-    >
-      {state === 'busy'
-        ? 'One sec…'
-        : state === 'on'
-          ? 'Reminders on for this device ✓ (tap to turn off)'
-          : 'Turn on reminders for this device'}
-    </button>
+      label="Reminders on this device"
+      onChange={(next) => (next ? enable() : disable())}
+    />
   );
 }

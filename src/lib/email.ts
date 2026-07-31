@@ -38,7 +38,7 @@ export function weeklySummaryHtml(displayName: string | null, rows: WeeklyRow[])
       <tr>
         <td style="padding:8px 12px;font-size:16px;">${r.emoji} ${r.name}</td>
         <td style="padding:8px 12px;font-size:16px;text-align:center;">${r.done}/${r.scheduled}</td>
-        <td style="padding:8px 12px;font-size:16px;text-align:center;">🔥 ${r.currentStreak}</td>
+        <td style="padding:8px 12px;font-size:16px;text-align:center;">${r.currentStreak}</td>
       </tr>`,
     )
     .join('');

@@ -1,82 +1,171 @@
 @import "tailwindcss";
 
-/* TinySteps palette — soft, calm, low-stimulation.
-   Off-white paper, near-black "ink" cards, muted pastel accents. */
+/* TinySteps "Indigo" design system — deep indigo surfaces, soft large
+   radii, one yellow accent, thin line icons, no emoji.
+   Light tokens on :root; dark tokens apply when the user picks Dark, or
+   picks System and the OS is dark (data-appearance is set pre-paint). */
 :root {
-  --paper: #f4f3ef;      /* app background */
-  --card: #ffffff;       /* light cards */
-  --ink: #191a1e;        /* dark cards / primary text */
-  --on-ink: #ffffff;     /* text sitting on an ink surface */
-  --ink-soft: #5c5e66;   /* secondary text (4.5:1 on paper) */
-  --sky: #bfdff2;        /* pastel blue accent */
-  --sky-deep: #8ec8ea;   /* primary action fill (with ink text) */
-  --mint: #cdecdb;       /* pastel green accent */
-  --blush: #f3cfdd;      /* pastel pink accent */
-  --butter: #f4e3b2;     /* pastel yellow accent (freezes/streaks) */
-  --line: #e4e2db;       /* hairline borders */
+  --paper: #f4f3fb;        /* page background */
+  --card: #ffffff;         /* cards, tab bar, inputs */
+  --surface-alt: #eceafc;  /* icon tiles, soft fills */
+  --surface-tint: #f2f0fc; /* segmented control track */
+  --ink: #2a2760;          /* primary text */
+  --ink-soft: #6f6ca8;     /* secondary text */
+  --ink-faint: #9d9ac9;    /* tertiary text, inactive tabs */
+  --ink-label: #8f8cc0;    /* uppercase field labels */
+  --primary: #5b57cf;      /* primary buttons, active icons */
+  --primary-hover: #4a45b4;
+  --on-primary: #ffffff;
+  --accent: #ffd84d;       /* FAB, milestone, dark-theme Done */
+  --accent-hover: #ffcf24;
+  --accent-ink: #3b3894;   /* text/icon on accent */
+  --track: #e3e0f7;        /* progress bar track */
+  --chart-idle: #e6e4f8;   /* inactive heatmap cells / bars */
+  --line: #efedfa;         /* dividers (legacy name kept) */
+  --dashed: #d5d1f0;       /* dashed add-routine border */
+  --success: #2f9e63;
+  --success-bg: #e6f5ec;
+  --on-ink: #ffffff;       /* text on an ink-filled surface (legacy) */
+  /* Legacy pastel aliases so older utility usage stays sensible. */
+  --sky: #eceafc;
+  --sky-deep: #5b57cf;
+  --mint: #e6f5ec;
+  --blush: #fbe7f0;
+  --butter: #fff3c9;
+  --shadow-card: 0 8px 20px rgba(42, 39, 96, 0.06);
+  --shadow-focus: 0 16px 36px rgba(42, 39, 96, 0.1);
+  --shadow-bar: 0 12px 28px rgba(42, 39, 96, 0.1);
+  --shadow-fab: 0 10px 22px rgba(255, 216, 77, 0.5);
+  --app-bg: #f4f3fb;
 }
 
-/* Dark mode: follows the device setting. Same layout, inverted surfaces —
-   "ink" becomes light so primary buttons stay the highest-contrast thing
-   on screen, pastels become deep muted tints. */
+/* Dark theme tokens (shared by explicit Dark and System+OS-dark). */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #151619;
-    --card: #1e2024;
-    --ink: #ecebe7;
-    --on-ink: #17181c;
-    --ink-soft: #a4a6ae;
-    --sky: #2b3d4c;
-    --sky-deep: #7db8de;
-    --mint: #28392f;
-    --blush: #402c37;
-    --butter: #3e3626;
-    --line: #33353a;
+  html:not([data-appearance="light"]) {
+    --paper: #191734;
+    --card: #2d2a62;
+    --surface-alt: rgba(255, 255, 255, 0.08);
+    --surface-tint: rgba(255, 255, 255, 0.08);
+    --ink: #ffffff;
+    --ink-soft: #a9a5d8;
+    --ink-faint: #8b87bd;
+    --ink-label: #a9a5d8;
+    --primary: #8d89f5;
+    --primary-hover: #a09df7;
+    --on-primary: #201d49;
+    --track: rgba(255, 255, 255, 0.14);
+    --chart-idle: rgba(255, 255, 255, 0.12);
+    --line: rgba(255, 255, 255, 0.1);
+    --dashed: rgba(255, 255, 255, 0.22);
+    --success: #5fd398;
+    --success-bg: rgba(71, 200, 133, 0.18);
+    --on-ink: #2a2760;
+    --sky: rgba(255, 255, 255, 0.08);
+    --sky-deep: #8d89f5;
+    --mint: rgba(71, 200, 133, 0.18);
+    --blush: rgba(255, 122, 178, 0.16);
+    --butter: rgba(255, 216, 77, 0.16);
+    --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.35);
+    --shadow-focus: 0 18px 40px rgba(0, 0, 0, 0.35);
+    --shadow-bar: 0 18px 40px rgba(0, 0, 0, 0.35);
+    --shadow-fab: 0 10px 22px rgba(255, 216, 77, 0.35);
+    --app-bg: linear-gradient(170deg, #221f47 0%, #191734 60%, #141227 100%);
   }
+}
+html[data-appearance="dark"] {
+  --paper: #191734;
+  --card: #2d2a62;
+  --surface-alt: rgba(255, 255, 255, 0.08);
+  --surface-tint: rgba(255, 255, 255, 0.08);
+  --ink: #ffffff;
+  --ink-soft: #a9a5d8;
+  --ink-faint: #8b87bd;
+  --ink-label: #a9a5d8;
+  --primary: #8d89f5;
+  --primary-hover: #a09df7;
+  --on-primary: #201d49;
+  --track: rgba(255, 255, 255, 0.14);
+  --chart-idle: rgba(255, 255, 255, 0.12);
+  --line: rgba(255, 255, 255, 0.1);
+  --dashed: rgba(255, 255, 255, 0.22);
+  --success: #5fd398;
+  --success-bg: rgba(71, 200, 133, 0.18);
+  --on-ink: #2a2760;
+  --sky: rgba(255, 255, 255, 0.08);
+  --sky-deep: #8d89f5;
+  --mint: rgba(71, 200, 133, 0.18);
+  --blush: rgba(255, 122, 178, 0.16);
+  --butter: rgba(255, 216, 77, 0.16);
+  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --shadow-focus: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --shadow-bar: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --shadow-fab: 0 10px 22px rgba(255, 216, 77, 0.35);
+  --app-bg: linear-gradient(170deg, #221f47 0%, #191734 60%, #141227 100%);
 }
 
 @theme inline {
   --color-paper: var(--paper);
   --color-card: var(--card);
+  --color-surface-alt: var(--surface-alt);
+  --color-surface-tint: var(--surface-tint);
   --color-ink: var(--ink);
-  --color-on-ink: var(--on-ink);
   --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-label: var(--ink-label);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-track: var(--track);
+  --color-chart-idle: var(--chart-idle);
+  --color-line: var(--line);
+  --color-dashed: var(--dashed);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-on-ink: var(--on-ink);
   --color-sky: var(--sky);
   --color-sky-deep: var(--sky-deep);
   --color-mint: var(--mint);
   --color-blush: var(--blush);
   --color-butter: var(--butter);
-  --color-line: var(--line);
-  --font-sans: var(--font-geist-sans);
-  --radius-card: 1.75rem; /* soft 28px corners everywhere */
-}
-
-/* Premium themes swap the accent pastels only — layout never changes.
-   Scoped to light scheme; in dark mode the dark palette wins. */
-@media (prefers-color-scheme: light) {
-  [data-theme="dusk"] {
-    --paper: #efeef4;
-    --sky: #ccc7ee;
-    --sky-deep: #aba2e3;
-    --mint: #d5e3f4;
-    --blush: #eacfe4;
-    --line: #ddd9e8;
-  }
-  [data-theme="meadow"] {
-    --paper: #f0f4ee;
-    --sky: #cfe8c9;
-    --sky-deep: #a8d89e;
-    --mint: #e0efd4;
-    --blush: #f0e3c8;
-    --line: #dde4d7;
-  }
+  --font-sans: var(--font-archivo);
+  --radius-card: 1.625rem;  /* 26px cards */
+  --radius-card-lg: 1.875rem; /* 30px focus card */
 }
 
 body {
-  background: var(--paper);
+  background: var(--app-bg);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Utility shadows matching the design's elevation scale. */
+.shadow-card { box-shadow: var(--shadow-card); }
+.shadow-focus { box-shadow: var(--shadow-focus); }
+.shadow-bar { box-shadow: var(--shadow-bar); }
+.shadow-fab { box-shadow: var(--shadow-fab); }
+
+/* Uppercase field/section label. */
+.ts-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-label);
+}
+
+/* The run flow is always dark, independent of theme. */
+.ts-run-screen {
+  background: linear-gradient(170deg, #2b2860 0%, #1b1938 100%);
+  color: #ffffff;
+}
+.ts-milestone-screen {
+  background: radial-gradient(115% 75% at 50% 14%, #6f6be6 0%, #4a45b4 52%, #2b2860 100%);
+  color: #ffffff;
 }
 
 /* Subtle motion only — and none at all if the user asks for none. */
@@ -88,19 +177,21 @@ body {
   }
 }
 
-/* Gentle pop used for the celebration screen. */
+/* Gentle pop used for celebration/interstitial screens. */
 @keyframes ts-pop {
   0% { transform: scale(0.92); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
 .ts-pop { animation: ts-pop 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
-/* Celebration confetti — soft pastel pieces drifting down once.
-   Killed automatically by the reduced-motion rule above. */
-@keyframes ts-confetti {
-  0% { transform: translateY(-8vh) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(105vh) rotate(540deg); opacity: 0.7; }
+/* Milestone number: 0.8 → 1 spring-ish scale. */
+@keyframes ts-milestone-num {
+  0% { transform: scale(0.8); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
+.ts-milestone-num { animation: ts-milestone-num 500ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+
 /* New step sliding in during a run. */
 @keyframes ts-step-in {
   0% { opacity: 0; transform: translateX(20px); }
@@ -114,13 +205,3 @@ body {
   50% { transform: scale(1.03); }
 }
 .ts-breathe { animation: ts-breathe 1.2s ease-in-out infinite; }
-
-.ts-confetti-piece {
-  position: fixed;
-  top: 0;
-  width: 10px;
-  height: 14px;
-  border-radius: 3px;
-  pointer-events: none;
-  animation: ts-confetti var(--fall-duration, 2.6s) ease-in var(--fall-delay, 0s) both;
-}

@@ -133,7 +133,7 @@ export async function createRoutine(
     .insert({
       user_id: userId,
       name: input.name,
-      emoji: input.emoji ?? '✨',
+      emoji: input.emoji ?? 'sparkles', // icon key (legacy column name)
       color: input.color ?? null,
       schedule_days: input.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6],
       reminder_time: input.reminderTime ?? null,
@@ -366,6 +366,46 @@ export async function listRestDaysBulk(
   fail(error);
   for (const r of data) map.get(r.routine_id)?.add(r.on_date);
   return map;
+}
+
+/** Step counts + total timer seconds per routine, one round trip. */
+export async function stepSummaryBulk(
+  db: Db,
+  routineIds: string[],
+): Promise<Map<string, { count: number; totalSeconds: number }>> {
+  const map = new Map<string, { count: number; totalSeconds: number }>(
+    routineIds.map((id) => [id, { count: 0, totalSeconds: 0 }]),
+  );
+  if (routineIds.length === 0) return map;
+  const { data, error } = await db
+    .from('steps')
+    .select('routine_id, timer_seconds')
+    .in('routine_id', routineIds);
+  fail(error);
+  for (const s of data) {
+    const entry = map.get(s.routine_id);
+    if (entry) {
+      entry.count += 1;
+      entry.totalSeconds += s.timer_seconds ?? 0;
+    }
+  }
+  return map;
+}
+
+/** Recent freeze events across all of a user's routines. */
+export async function listRecentFreezeEvents(
+  db: Db,
+  userId: string,
+  limit = 20,
+): Promise<{ routineId: string; kind: 'earned' | 'consumed'; onDate: string }[]> {
+  const { data, error } = await db
+    .from('freeze_events')
+    .select('routine_id, kind, on_date')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  fail(error);
+  return data.map((e: any) => ({ routineId: e.routine_id, kind: e.kind, onDate: e.on_date }));
 }
 
 // ---- rest days & run progress --------------------------------------------
