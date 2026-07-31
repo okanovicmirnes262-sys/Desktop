@@ -8,7 +8,12 @@ export async function POST(request: Request) {
   const user = await getSessionUser(supabase);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+  }
   if (!body?.endpoint || !body?.keys?.p256dh || !body?.keys?.auth) {
     return NextResponse.json({ error: 'invalid subscription' }, { status: 400 });
   }
@@ -21,7 +26,15 @@ export async function DELETE(request: Request) {
   const user = await getSessionUser(supabase);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const { endpoint } = await request.json();
+  let endpoint: unknown;
+  try {
+    ({ endpoint } = await request.json());
+  } catch {
+    return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+  }
+  if (typeof endpoint !== 'string' || !endpoint) {
+    return NextResponse.json({ error: 'invalid endpoint' }, { status: 400 });
+  }
   await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
   return NextResponse.json({ ok: true });
 }

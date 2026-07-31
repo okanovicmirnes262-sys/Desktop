@@ -46,7 +46,6 @@ export default async function StatsPage() {
       streak,
       cells,
       rate: completionRate(routine, completions, today, 30, restDays),
-      doneLast30: Array.from(done).filter((d) => d >= addDays(today, -30)).length,
     };
   });
 

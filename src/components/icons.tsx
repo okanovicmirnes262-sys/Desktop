@@ -52,6 +52,12 @@ const LEGACY_EMOJI: Record<string, string> = {
   '✨': 'sparkles',
 };
 
+/** Resolve any stored value (icon key or legacy emoji) to a valid key. */
+export function iconKeyOf(value: string): string {
+  if (ROUTINE_ICONS[value]) return value;
+  return LEGACY_EMOJI[value] ?? 'sparkles';
+}
+
 export function routineIcon(value: string): LucideIcon {
   return ROUTINE_ICONS[value] ?? ROUTINE_ICONS[LEGACY_EMOJI[value] ?? ''] ?? Sparkles;
 }

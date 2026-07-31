@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       id?: string;
       status?: string;
       plan_id?: string;
-      renewal_period_end?: string | null;
+      renewal_period_end?: string | number | null;
       metadata?: { userId?: string };
     };
   };
@@ -41,10 +41,18 @@ export async function POST(request: Request) {
   const userId = event.data?.metadata?.userId;
   if (!userId) return NextResponse.json({ ok: true, skipped: 'no userId metadata' });
 
-  const active =
-    event.action === 'membership.went_valid' ||
-    event.data?.status === 'active' ||
-    event.data?.status === 'trialing';
+  // Only act on events that clearly change membership validity — anything
+  // else is ignored so a stray event can never downgrade a paying user.
+  let active: boolean;
+  if (event.action === 'membership.went_valid') active = true;
+  else if (event.action === 'membership.went_invalid') active = false;
+  else if (event.data?.status === 'active' || event.data?.status === 'trialing') active = true;
+  else return NextResponse.json({ ok: true, ignored: event.action ?? 'unknown' });
+
+  // Whop may send the period end as a Unix timestamp — normalize to ISO.
+  const rawEnd = event.data?.renewal_period_end;
+  const periodEnd =
+    typeof rawEnd === 'number' ? new Date(rawEnd * 1000).toISOString() : (rawEnd ?? null);
 
   const db = createAdminClient();
   await upsertSubscription(db, {
@@ -57,7 +65,7 @@ export async function POST(request: Request) {
         : event.data?.plan_id === process.env.NEXT_PUBLIC_WHOP_PLAN_ID_MONTHLY
           ? 'monthly'
           : null,
-    currentPeriodEnd: event.data?.renewal_period_end ?? null,
+    currentPeriodEnd: periodEnd,
   });
 
   return NextResponse.json({ ok: true });

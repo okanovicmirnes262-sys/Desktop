@@ -15,9 +15,11 @@ export const PRICING = {
 /** The single premium check. `null` = no subscription row = free tier. */
 export function hasPremium(sub: Subscription | null, now: Date = new Date()): boolean {
   if (!sub || sub.status !== 'active') return false;
-  // No period end recorded → trust the status until the next webhook/verify.
+  // No/unparseable period end → trust the status until the next webhook/verify.
   if (!sub.currentPeriodEnd) return true;
-  return new Date(sub.currentPeriodEnd).getTime() > now.getTime();
+  const end = new Date(sub.currentPeriodEnd).getTime();
+  if (Number.isNaN(end)) return true;
+  return end > now.getTime();
 }
 
 export function canCreateRoutine(activeRoutineCount: number, sub: Subscription | null): boolean {

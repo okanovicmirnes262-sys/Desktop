@@ -39,12 +39,13 @@ export async function sendPush(
   }
 }
 
-/** Firm, clear reminder copy — states the plan, no nagging or guilt. */
-export function reminderCopy(routineName: string, time: string) {
+/** Firm, clear reminder copy — states the plan, no nagging or guilt.
+ *  Tag is per-routine so two due routines never replace each other. */
+export function reminderCopy(routineName: string, time: string, routineId: string) {
   return {
     title: `${routineName} — ${time}`,
     body: `It's time. Open TinySteps and take the first step.`,
-    tag: `reminder`,
+    tag: `reminder-${routineId}`,
     url: '/app',
   };
 }

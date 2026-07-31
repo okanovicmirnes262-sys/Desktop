@@ -28,6 +28,17 @@ async function requireUser() {
   return { supabase, user };
 }
 
+/** Guards actions that take a routineId: RLS hides other users' routines,
+ *  so a non-owned id resolves to null → reject before any write. */
+async function requireOwnRoutine(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  routineId: string,
+) {
+  const routine = await db.getRoutine(supabase, routineId);
+  if (!routine) throw new Error('routine not found');
+  return routine;
+}
+
 // ---- routines -------------------------------------------------------------
 
 export async function createRoutineAction(input: {
@@ -77,6 +88,9 @@ export async function deleteRoutineAction(routineId: string) {
   const { supabase } = await requireUser();
   await db.deleteRoutine(supabase, routineId);
   revalidatePath('/app');
+  revalidatePath('/app/stats');
+  revalidatePath('/app/freezes');
+  revalidatePath('/app/settings');
   redirect('/app');
 }
 
@@ -84,6 +98,7 @@ export async function deleteRoutineAction(routineId: string) {
 
 export async function addStepAction(routineId: string, title: string, timerSeconds: number | null) {
   const { supabase, user } = await requireUser();
+  await requireOwnRoutine(supabase, routineId);
   const steps = await db.listSteps(supabase, routineId);
   await db.createStep(supabase, user.id, routineId, {
     title,
@@ -129,22 +144,31 @@ export interface CompletionCelebration {
 /** Called when the user finishes the last step of a run. */
 export async function completeRoutineAction(routineId: string): Promise<CompletionCelebration> {
   const { supabase, user } = await requireUser();
-  const profile = await db.getProfile(supabase, user.id);
+  // Ownership check + profile in parallel.
+  const [profile, , stored0] = await Promise.all([
+    db.getProfile(supabase, user.id),
+    requireOwnRoutine(supabase, routineId),
+    db.getStreak(supabase, routineId),
+  ]);
   const today = todayInTz(profile.timezone);
 
-  const stored = (await db.getStreak(supabase, routineId)) ?? initialStreakState(routineId);
+  const stored = stored0 ?? initialStreakState(routineId);
   const restDays = new Set(
     await db.listRestDays(supabase, routineId, stored.lastCompletedOn ?? today),
   );
   const { state, events } = applyCompletion(stored, today, restDays);
 
-  await db.insertCompletion(supabase, user.id, routineId, today);
-  await db.saveStreak(supabase, user.id, state);
-  await db.insertFreezeEvents(supabase, user.id, routineId, events);
-  await db.clearRunProgress(supabase, routineId);
+  // Independent writes run in parallel — one round trip of latency.
+  await Promise.all([
+    db.insertCompletion(supabase, user.id, routineId, today),
+    db.saveStreak(supabase, user.id, state),
+    db.insertFreezeEvents(supabase, user.id, routineId, events),
+    db.clearRunProgress(supabase, routineId),
+  ]);
 
   revalidatePath('/app');
   revalidatePath('/app/stats');
+  revalidatePath('/app/freezes');
   return {
     currentStreak: state.currentStreak,
     bestStreak: state.bestStreak,
@@ -183,7 +207,10 @@ export async function takeRestDayAction(
   routineId: string,
 ): Promise<{ ok: true } | { ok: false; error: 'limit' | 'already_done' }> {
   const { supabase, user } = await requireUser();
-  const profile = await db.getProfile(supabase, user.id);
+  const [profile] = await Promise.all([
+    db.getProfile(supabase, user.id),
+    requireOwnRoutine(supabase, routineId),
+  ]);
   const today = todayInTz(profile.timezone);
 
   const doneToday = await db.listCompletions(supabase, routineId, today);
@@ -194,13 +221,17 @@ export async function takeRestDayAction(
 
   await db.addRestDay(supabase, user.id, routineId, today);
   revalidatePath('/app');
+  revalidatePath('/app/stats');
   return { ok: true };
 }
 
 /** Persist where the user is in today's run so it survives reloads. */
 export async function saveRunProgressAction(routineId: string, stepIndex: number) {
   const { supabase, user } = await requireUser();
-  const profile = await db.getProfile(supabase, user.id);
+  const [profile] = await Promise.all([
+    db.getProfile(supabase, user.id),
+    requireOwnRoutine(supabase, routineId),
+  ]);
   const today = todayInTz(profile.timezone);
   await db.saveRunProgress(supabase, user.id, routineId, today, stepIndex);
 }
@@ -243,6 +274,8 @@ export async function updateTimezoneAction(timezone: string) {
     return;
   }
   await db.updateProfile(supabase, user.id, { timezone });
+  revalidatePath('/app');
+  revalidatePath('/app/settings');
 }
 
 export async function updateWeeklyEmailAction(enabled: boolean) {

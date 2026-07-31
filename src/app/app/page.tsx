@@ -32,10 +32,12 @@ export default async function TodayPage() {
   const weekStart = addDays(today, -weekdayOf(today)); // Sunday of this week
 
   const ids = routines.map((r) => r.id);
+  // 60 days of rest days is enough for any survivable gap (3 freezes +
+  // 2 rest days/month); anything older has broken the streak regardless.
   const [streaksMap, completionsMap, restMap, stepsMap] = await Promise.all([
     db.getStreaksBulk(supabase, ids),
     db.listCompletionsBulk(supabase, ids, weekStart),
-    db.listRestDaysBulk(supabase, ids, addDays(today, -45)),
+    db.listRestDaysBulk(supabase, ids, addDays(today, -60)),
     db.stepSummaryBulk(supabase, ids),
   ]);
 
@@ -43,10 +45,12 @@ export default async function TodayPage() {
     const stored = streaksMap.get(routine.id) ?? null;
     const weekCompletions = completionsMap.get(routine.id) ?? [];
     const restDays = restMap.get(routine.id) ?? new Set<string>();
-    const streak = stored ? reconcile(stored, today, restDays).state : null;
+    const reconciled = stored ? reconcile(stored, today, restDays) : null;
     return {
       routine,
-      streak,
+      stored,
+      reconciled,
+      streak: reconciled?.state ?? null,
       weekCompletions,
       steps: stepsMap.get(routine.id) ?? { count: 0, totalSeconds: 0 },
       doneToday: weekCompletions.some((c) => c.completedOn === today),
@@ -54,6 +58,24 @@ export default async function TodayPage() {
       restDays,
     };
   });
+
+  // Persist reconciled streaks: freeze spends and breaks for elapsed days
+  // land in the DB now, so Freezes/Settings/History never show stale
+  // balances. Only routines whose state actually changed are written.
+  await Promise.all(
+    cards
+      .filter(
+        (c) =>
+          c.stored &&
+          c.reconciled &&
+          (c.reconciled.events.length > 0 ||
+            c.reconciled.state.currentStreak !== c.stored.currentStreak),
+      )
+      .flatMap((c) => [
+        db.saveStreak(supabase, user.id, c.reconciled!.state),
+        db.insertFreezeEvents(supabase, user.id, c.routine.id, c.reconciled!.events),
+      ]),
+  );
 
   // Weekly summary + progress bar (rest days don't count against).
   let weekScheduled = 0;

@@ -272,12 +272,16 @@ export function RunPlayer({
             onToggle={() => setRunning((r) => !r)}
           />
         )}
-        {!stepHasTimer && routineTimer && (
-          <TimerRing
-            totalSeconds={routineTimer}
-            running={running}
-            onToggle={() => setRunning((r) => !r)}
-          />
+        {routineTimer && (
+          // Mounted once for the whole run (hidden behind step timers) so
+          // it keeps counting across steps instead of resetting.
+          <div className={stepHasTimer ? 'hidden' : ''}>
+            <TimerRing
+              totalSeconds={routineTimer}
+              running={running}
+              onToggle={() => setRunning((r) => !r)}
+            />
+          </div>
         )}
 
         <div key={index} className="ts-step-in">

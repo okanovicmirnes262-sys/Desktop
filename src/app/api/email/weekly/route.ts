@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   // Map user ids to emails via the auth admin API.
   const emails = new Map<string, string>();
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; page <= 500; page++) { // no practical cap; stops when a page comes back short
     const { data, error: authErr } = await db.auth.admin.listUsers({ page, perPage: 200 });
     if (authErr || data.users.length === 0) break;
     for (const u of data.users) if (u.email) emails.set(u.id, u.email);
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
     const ids = routines.map((r) => r.id);
     const [{ data: completions }, { data: streaks }] = await Promise.all([
-      db.from('completions').select('routine_id, completed_on').in('routine_id', ids).gte('completed_on', weekAgo),
+      db.from('completions').select('routine_id, completed_on').in('routine_id', ids).gte('completed_on', weekAgo).lt('completed_on', today),
       db.from('streaks').select('routine_id, current_streak').in('routine_id', ids),
     ]);
 

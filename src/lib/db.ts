@@ -64,8 +64,14 @@ function fail(error: { message: string } | null): asserts error is null {
 // ---- profiles -------------------------------------------------------------
 
 export async function getProfile(db: Db, userId: string): Promise<Profile> {
-  const { data, error } = await db.from('profiles').select('*').eq('id', userId).single();
+  const { data, error } = await db.from('profiles').select('*').eq('id', userId).maybeSingle();
   fail(error);
+  if (!data) {
+    // Signup trigger hasn't run (or predates it) — create a default row
+    // so every page keeps working, and return sane defaults either way.
+    await db.from('profiles').insert({ id: userId }).select().maybeSingle();
+    return { id: userId, displayName: null, timezone: 'UTC', theme: 'default', onboarded: false, weeklyEmail: true };
+  }
   return {
     id: data.id,
     displayName: data.display_name,

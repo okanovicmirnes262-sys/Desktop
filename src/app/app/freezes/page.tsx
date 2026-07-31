@@ -1,7 +1,8 @@
 import { Snowflake } from 'lucide-react';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
-import { COMPLETIONS_PER_FREEZE, MAX_FREEZES } from '@/core/streak';
+import { COMPLETIONS_PER_FREEZE, MAX_FREEZES, reconcile } from '@/core/streak';
+import { addDays, todayInTz } from '@/core/dates';
 import { RoutineIcon } from '@/components/icons';
 
 // Freezes: what's banked per routine, and the recent earn/spend history.
@@ -10,11 +11,24 @@ export default async function FreezesPage() {
   const user = await getSessionUser(supabase);
   if (!user) return null;
 
-  const routines = await db.listRoutines(supabase, user.id);
-  const [streaks, events] = await Promise.all([
-    db.getStreaksBulk(supabase, routines.map((r) => r.id)),
+  const [profile, routines] = await Promise.all([
+    db.getProfile(supabase, user.id),
+    db.listRoutines(supabase, user.id),
+  ]);
+  const today = todayInTz(profile.timezone);
+  const ids = routines.map((r) => r.id);
+  const [storedMap, restMap, events] = await Promise.all([
+    db.getStreaksBulk(supabase, ids),
+    db.listRestDaysBulk(supabase, ids, addDays(today, -60)),
     db.listRecentFreezeEvents(supabase, user.id, 15),
   ]);
+  // Display reconciled balances so this page never lags behind Today.
+  const streaks = new Map(
+    [...storedMap.entries()].map(([id, s]) => [
+      id,
+      reconcile(s, today, restMap.get(id) ?? new Set()).state,
+    ]),
+  );
   const names = new Map(routines.map((r) => [r.id, r.name]));
 
   return (

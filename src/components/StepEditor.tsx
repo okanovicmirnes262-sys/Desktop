@@ -19,12 +19,22 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
   const [newTimer, setNewTimer] = useState('');
   const [pending, startTransition] = useTransition();
 
+  // Local optimistic ordering so two quick taps don't both compute from
+  // the same stale server order. Re-synced when fresh props arrive.
+  const [localSteps, setLocalSteps] = useState(steps);
+  const [prevSteps, setPrevSteps] = useState(steps);
+  if (steps !== prevSteps) {
+    setPrevSteps(steps);
+    setLocalSteps(steps);
+  }
+
   function move(index: number, dir: -1 | 1) {
-    const ids = steps.map((s) => s.id);
     const target = index + dir;
-    if (target < 0 || target >= ids.length) return;
-    [ids[index], ids[target]] = [ids[target], ids[index]];
-    startTransition(() => reorderStepsAction(routineId, ids));
+    if (target < 0 || target >= localSteps.length) return;
+    const next = [...localSteps];
+    [next[index], next[target]] = [next[target], next[index]];
+    setLocalSteps(next);
+    startTransition(() => reorderStepsAction(routineId, next.map((s) => s.id)));
   }
 
   function add(e: React.FormEvent) {
@@ -42,7 +52,7 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
       <p className="ts-label px-1">Steps — small enough that starting feels easy</p>
 
       <ol className="flex flex-col gap-2">
-        {steps.map((step, i) => (
+        {localSteps.map((step, i) => (
           <li key={step.id} className="shadow-card flex items-center gap-2 rounded-[20px] bg-card p-3">
             <div className="flex flex-col">
               <button
@@ -55,7 +65,7 @@ export function StepEditor({ routineId, steps }: { routineId: string; steps: Ste
               </button>
               <button
                 aria-label={`Move "${step.title}" down`}
-                disabled={i === steps.length - 1 || pending}
+                disabled={i === localSteps.length - 1 || pending}
                 onClick={() => move(i, 1)}
                 className="flex h-8 w-10 items-center justify-center rounded-lg text-ink-faint disabled:opacity-25"
               >

@@ -7,16 +7,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Routine } from '@/core/types';
 import { createRoutineAction, updateRoutineAction } from '@/lib/actions';
-import { ICON_CHOICES, ROUTINE_ICONS } from '@/components/icons';
+import { ICON_CHOICES, ROUTINE_ICONS, iconKeyOf } from '@/components/icons';
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export function RoutineForm({ routine }: { routine?: Routine }) {
   const router = useRouter();
   const [name, setName] = useState(routine?.name ?? '');
-  const [icon, setIcon] = useState(
-    routine && ROUTINE_ICONS[routine.emoji] ? routine.emoji : 'sun',
-  );
+  const [icon, setIcon] = useState(routine ? iconKeyOf(routine.emoji) : 'sun');
   const [days, setDays] = useState<number[]>(routine?.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6]);
   const [reminder, setReminder] = useState(routine?.reminderTime ?? '');
   const [reminderWeekend, setReminderWeekend] = useState(routine?.reminderTimeWeekend ?? '');

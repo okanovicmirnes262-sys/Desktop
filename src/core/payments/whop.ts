@@ -15,7 +15,7 @@ interface WhopMembership {
   status: string; // 'active' | 'trialing' | 'past_due' | 'canceled' | ...
   plan_id?: string;
   plan?: { id: string };
-  renewal_period_end?: string | null;
+  renewal_period_end?: string | number | null;
   email?: string;
 }
 
@@ -54,11 +54,14 @@ export class WhopProvider implements PaymentProvider {
     }
 
     const planId = match.plan_id ?? match.plan?.id;
+    // Whop reports the period end as a Unix timestamp — normalize to ISO.
+    const rawEnd = match.renewal_period_end;
     return {
       active: true,
       plan: planId === this.config.planIdYearly ? 'yearly' : 'monthly',
       providerMembershipId: match.id,
-      currentPeriodEnd: match.renewal_period_end ?? null,
+      currentPeriodEnd:
+        typeof rawEnd === 'number' ? new Date(rawEnd * 1000).toISOString() : (rawEnd ?? null),
     };
   }
 

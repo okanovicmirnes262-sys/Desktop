@@ -7,7 +7,9 @@ import { createClient } from '@/lib/supabase/client';
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') ?? '/app';
+  // Only same-site paths — never an off-site open redirect.
+  const rawNext = params.get('next');
+  const next = rawNext?.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/app';
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
