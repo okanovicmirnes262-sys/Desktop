@@ -2,8 +2,36 @@
 
 // Small client controls used on the Settings page.
 
-import { useSyncExternalStore, useTransition } from 'react';
-import { updateThemeAction, updateTimezoneAction } from '@/lib/actions';
+import { useState, useSyncExternalStore, useTransition } from 'react';
+import {
+  updateThemeAction,
+  updateTimezoneAction,
+  updateWeeklyEmailAction,
+} from '@/lib/actions';
+
+/** Weekly summary email on/off (account-wide preference). */
+export function WeeklyEmailToggle({ initial }: { initial: boolean }) {
+  const [on, setOn] = useState(initial);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      disabled={pending}
+      onClick={() => {
+        const next = !on;
+        setOn(next);
+        startTransition(() => updateWeeklyEmailAction(next));
+      }}
+      className={`w-full rounded-full px-6 py-4 text-lg font-semibold transition-transform active:scale-95 disabled:opacity-50 ${
+        on ? 'bg-mint' : 'bg-paper text-ink-soft'
+      }`}
+    >
+      {on ? 'Weekly summary email on ✉️ (tap to turn off)' : 'Weekly summary email off'}
+    </button>
+  );
+}
 import { SOUND_PREF_KEY } from '@/components/RunPlayer';
 
 // Tiny external store around localStorage so the toggle reads/writes the

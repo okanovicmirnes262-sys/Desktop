@@ -26,6 +26,7 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
   const [color, setColor] = useState<ColorKey>(routine?.color ?? null);
   const [days, setDays] = useState<number[]>(routine?.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6]);
   const [reminder, setReminder] = useState(routine?.reminderTime ?? '');
+  const [reminderWeekend, setReminderWeekend] = useState(routine?.reminderTimeWeekend ?? '');
   const [timerMin, setTimerMin] = useState(
     routine?.timerSeconds ? String(Math.round(routine.timerSeconds / 60)) : '',
   );
@@ -50,6 +51,7 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
       color,
       scheduleDays: days,
       reminderTime: reminder || null,
+      reminderTimeWeekend: reminder && reminderWeekend ? reminderWeekend : null,
       timerSeconds: timerMin ? Number(timerMin) * 60 : null,
     };
     if (routine) {
@@ -155,6 +157,21 @@ export function RoutineForm({ routine }: { routine?: Routine }) {
           A firm nudge at this time on scheduled days.
         </span>
       </label>
+
+      {reminder && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Weekend reminder (optional)</span>
+          <input
+            type="time"
+            value={reminderWeekend}
+            onChange={(e) => setReminderWeekend(e.target.value)}
+            className="rounded-2xl border border-line bg-card px-5 py-4 text-lg outline-none focus:border-sky-deep"
+          />
+          <span className="text-sm text-ink-soft">
+            Different time for Saturday & Sunday. Empty = same as weekdays.
+          </span>
+        </label>
+      )}
 
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Whole-routine timer, minutes (optional)</span>

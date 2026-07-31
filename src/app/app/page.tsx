@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import * as db from '@/lib/db';
-import { addDays, todayInTz, weekdayOf } from '@/core/dates';
+import { addDays, minutesOfDay, timeInTz, todayInTz, weekdayOf } from '@/core/dates';
 import { reconcile } from '@/core/streak';
 import { canCreateRoutine } from '@/core/entitlements';
 import { seedExampleRoutinesAction, skipOnboardingAction } from '@/lib/actions';
@@ -40,7 +40,7 @@ export default async function TodayPage() {
     db.listRestDaysBulk(supabase, ids, addDays(today, -45)),
   ]);
 
-  const cards = routines.map((routine) => {
+  const cards = routines.map((routine, i) => {
     const stored = streaksMap.get(routine.id) ?? null;
     const weekCompletions = completionsMap.get(routine.id) ?? [];
     const restDays = restMap.get(routine.id) ?? new Set<string>();
@@ -53,6 +53,8 @@ export default async function TodayPage() {
       doneToday: weekCompletions.some((c) => c.completedOn === today),
       restToday: restDays.has(today),
       restDays,
+      // Color sticks to the routine, not to today's card order.
+      pastel: (routine.color && COLOR_CLASSES[routine.color]) ?? ROTATION[i % ROTATION.length],
     };
   });
 
@@ -71,15 +73,33 @@ export default async function TodayPage() {
     }
   }
 
-  const hour = Number(
-    new Intl.DateTimeFormat('en-GB', {
-      timeZone: profile.timezone,
-      hour: 'numeric',
-      hourCycle: 'h23',
-    }).format(new Date()),
-  );
+  const nowMin = minutesOfDay(timeInTz(profile.timezone));
+  const hour = Math.floor(nowMin / 60);
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const atLimit = !canCreateRoutine(routines.length, sub);
+
+  // Order cards by relevance: what's near its time now floats up, done and
+  // resting routines sink to the bottom. Circular distance keeps a 21:30
+  // routine near the top in the evening, not just before midnight.
+  const sorted = cards
+    .map((card, i) => {
+      let rank: number;
+      if (card.doneToday || card.restToday) {
+        rank = 100_000 + i;
+      } else if (card.routine.reminderTime) {
+        const rem = minutesOfDay(card.routine.reminderTime);
+        const diff = Math.abs(rem - nowMin);
+        rank = Math.min(diff, 1440 - diff);
+      } else {
+        rank = 720 + i; // no reminder: neutral middle, stable order
+      }
+      return { card, rank };
+    })
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ card }) => card);
+
+  const nextUp = sorted.find((c) => !c.doneToday && !c.restToday);
+  const allSettled = cards.length > 0 && !nextUp;
 
   return (
     <main className="flex flex-col gap-5">
@@ -94,6 +114,26 @@ export default async function TodayPage() {
             : 'One tiny step at a time.'}
         </p>
       </header>
+
+      {/* "Just one step": for days when starting is the hard part. */}
+      {nextUp && (
+        <Link
+          href={`/app/routines/${nextUp.routine.id}/run?solo=1`}
+          className="rounded-full bg-sky-deep px-6 py-3 text-center font-semibold transition-transform active:scale-95"
+        >
+          🐣 Just one step — start tiny
+        </Link>
+      )}
+
+      {allSettled && (
+        <div className="rounded-card bg-mint p-8 text-center">
+          <p className="text-5xl" aria-hidden>
+            ☀️
+          </p>
+          <h2 className="mt-3 text-xl font-semibold">All done for today</h2>
+          <p className="mt-1 text-ink-soft">Enjoy the rest of your day — you earned it.</p>
+        </div>
+      )}
 
       {!profile.onboarded && (
         <div className="rounded-card bg-sky p-6">
@@ -117,9 +157,7 @@ export default async function TodayPage() {
         </div>
       )}
 
-      {cards.map(({ routine, streak, doneToday, restToday }, i) => {
-        const pastel =
-          (routine.color && COLOR_CLASSES[routine.color]) ?? ROTATION[i % ROTATION.length];
+      {sorted.map(({ routine, streak, doneToday, restToday, pastel }) => {
         const settled = doneToday || restToday;
         return (
           <div key={routine.id} className={`rounded-card ${settled ? 'bg-card' : pastel} p-6`}>
@@ -171,9 +209,15 @@ export default async function TodayPage() {
       })}
 
       {routines.length === 0 && profile.onboarded && (
-        <p className="rounded-card bg-card p-6 text-center text-ink-soft">
-          No routines yet. Create your first one below.
-        </p>
+        <div className="rounded-card bg-card p-8 text-center">
+          <p className="text-5xl" aria-hidden>
+            🌱
+          </p>
+          <h2 className="mt-3 text-xl font-semibold">A fresh start</h2>
+          <p className="mt-1 text-ink-soft">
+            One routine, a few tiny steps. That&apos;s all it takes to begin.
+          </p>
+        </div>
       )}
 
       {atLimit ? (

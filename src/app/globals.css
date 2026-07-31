@@ -101,6 +101,20 @@ body {
   0% { transform: translateY(-8vh) rotate(0deg); opacity: 1; }
   100% { transform: translateY(105vh) rotate(540deg); opacity: 0.7; }
 }
+/* New step sliding in during a run. */
+@keyframes ts-step-in {
+  0% { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 1; transform: none; }
+}
+.ts-step-in { animation: ts-step-in 220ms ease-out both; }
+
+/* Timer ring "breathing" during the last 10 seconds. */
+@keyframes ts-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+.ts-breathe { animation: ts-breathe 1.2s ease-in-out infinite; }
+
 .ts-confetti-piece {
   position: fixed;
   top: 0;

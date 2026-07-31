@@ -49,9 +49,13 @@ export function TimerRing({ totalSeconds, running, onFinish, size = 260 }: Timer
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
 
+  // The ring "breathes" for the final 10 seconds — a gentle heads-up
+  // instead of an alarm. Disabled automatically under reduced motion.
+  const closing = running && remaining > 0 && remaining <= 10;
+
   return (
     <div
-      className="relative"
+      className={`relative ${closing ? 'ts-breathe' : ''}`}
       style={{ width: size, height: size }}
       role="timer"
       aria-label={`${mins} minutes ${secs} seconds remaining`}

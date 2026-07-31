@@ -50,17 +50,17 @@ function pseudoRandom(seed: number) {
   return x - Math.floor(x);
 }
 
-function Confetti() {
+function Confetti({ count = 28 }: { count?: number }) {
   // Deterministic scatter; reduced-motion users get none (CSS kills it).
   const pieces = useMemo(
     () =>
-      Array.from({ length: 28 }, (_, i) => ({
+      Array.from({ length: count }, (_, i) => ({
         left: `${pseudoRandom(i + 1) * 100}%`,
         color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
         delay: `${pseudoRandom(i + 100) * 0.6}s`,
         duration: `${2 + pseudoRandom(i + 200) * 1.6}s`,
       })),
-    [],
+    [count],
   );
   return (
     <div aria-hidden>
@@ -84,14 +84,18 @@ export function RunPlayer({
   routine,
   steps,
   initialStepIndex = 0,
+  solo = false,
 }: {
   routine: Routine;
   steps: Step[];
   initialStepIndex?: number;
+  /** "Just one step" mode: celebrate after the first step, then offer more. */
+  solo?: boolean;
 }) {
   const canResume = initialStepIndex > 0 && initialStepIndex < steps.length;
   const [index, setIndex] = useState(0);
-  const [resumePrompt, setResumePrompt] = useState(canResume);
+  const [resumePrompt, setResumePrompt] = useState(canResume && !solo);
+  const [soloPause, setSoloPause] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [celebration, setCelebration] = useState<CompletionCelebration | null>(null);
   // Routine-level timer keeps running across steps; mounted once.
@@ -106,14 +110,18 @@ export function RunPlayer({
   }
 
   async function advance() {
+    navigator.vibrate?.(12); // subtle tap feedback where supported
     if (index + 1 < steps.length) {
       goTo(index + 1);
+      // Solo mode: after the very first step, that's already a win.
+      if (solo && index === 0) setSoloPause(true);
       return;
     }
     setFinishing(true);
     try {
       const result = await completeRoutineAction(routine.id);
       playChime();
+      navigator.vibrate?.([30, 40, 30]);
       setCelebration(result);
     } finally {
       setFinishing(false);
@@ -121,20 +129,29 @@ export function RunPlayer({
   }
 
   if (celebration) {
+    const milestone = celebration.milestone;
     return (
       <div className="ts-pop flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <Confetti />
-        <div className="rounded-card w-full bg-mint p-8">
+        <Confetti count={milestone ? 64 : 28} />
+        <div className={`rounded-card w-full p-8 ${milestone ? 'bg-butter' : 'bg-mint'}`}>
           <p className="text-6xl" aria-hidden>
-            🎉
+            {milestone ? '🏆' : '🎉'}
           </p>
-          <h1 className="mt-4 text-3xl font-semibold">Routine done</h1>
-          <p className="mt-3 text-xl">
-            🔥 {celebration.currentStreak}-day streak
-            {celebration.currentStreak >= celebration.bestStreak && celebration.currentStreak > 1
-              ? ' — your best yet'
-              : ''}
-          </p>
+          <h1 className="mt-4 text-3xl font-semibold">
+            {milestone ? `${milestone} days!` : 'Routine done'}
+          </h1>
+          {milestone ? (
+            <p className="mt-3 text-xl">
+              A {milestone}-day streak. That&apos;s not luck — that&apos;s you, showing up.
+            </p>
+          ) : (
+            <p className="mt-3 text-xl">
+              🔥 {celebration.currentStreak}-day streak
+              {celebration.currentStreak >= celebration.bestStreak && celebration.currentStreak > 1
+                ? ' — your best yet'
+                : ''}
+            </p>
+          )}
           {celebration.freezeEarned && (
             <p className="mt-3 rounded-full bg-card px-4 py-2 font-medium">
               🧊 You earned a streak freeze ({celebration.freezeBalance}/3 banked)
@@ -146,6 +163,31 @@ export function RunPlayer({
           className="w-full rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95"
         >
           Back to Today
+        </Link>
+      </div>
+    );
+  }
+
+  if (soloPause) {
+    return (
+      <div className="ts-pop flex flex-1 flex-col items-center justify-center gap-6 text-center">
+        <div className="rounded-card w-full bg-mint p-8">
+          <p className="text-5xl" aria-hidden>
+            🐣
+          </p>
+          <h1 className="mt-4 text-2xl font-semibold">That&apos;s a win.</h1>
+          <p className="mt-2">
+            One step done. Sometimes that&apos;s all it takes to get rolling.
+          </p>
+        </div>
+        <button
+          onClick={() => setSoloPause(false)}
+          className="w-full rounded-full bg-ink px-8 py-5 text-lg font-semibold text-on-ink transition-transform active:scale-95"
+        >
+          Keep going
+        </button>
+        <Link href="/app" className="py-2 text-ink-soft underline underline-offset-4">
+          Done for now — progress is saved
         </Link>
       </div>
     );
@@ -226,7 +268,11 @@ export function RunPlayer({
           </div>
         )}
 
-        <h1 className="text-balance px-2 text-4xl font-semibold leading-tight tracking-tight">
+        {/* Keyed by index so each step slides in gently. */}
+        <h1
+          key={index}
+          className="ts-step-in text-balance px-2 text-4xl font-semibold leading-tight tracking-tight"
+        >
           {step.title}
         </h1>
       </div>

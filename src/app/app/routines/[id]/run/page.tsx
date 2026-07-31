@@ -4,8 +4,15 @@ import * as db from '@/lib/db';
 import { RunPlayer } from '@/components/RunPlayer';
 import { todayInTz } from '@/core/dates';
 
-export default async function RunPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RunPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ solo?: string }>;
+}) {
   const { id } = await params;
+  const solo = (await searchParams).solo === '1';
   const supabase = await createClient();
   const routine = await db.getRoutine(supabase, id);
   if (!routine) notFound();
@@ -25,7 +32,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
 
   return (
     <main className="flex min-h-[calc(100vh-8rem)] flex-col">
-      <RunPlayer routine={routine} steps={steps} initialStepIndex={initialStepIndex} />
+      <RunPlayer routine={routine} steps={steps} initialStepIndex={initialStepIndex} solo={solo} />
     </main>
   );
 }

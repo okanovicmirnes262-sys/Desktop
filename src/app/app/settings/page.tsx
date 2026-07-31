@@ -4,7 +4,12 @@ import { getProfile, getSubscription } from '@/lib/db';
 import { hasPremium } from '@/core/entitlements';
 import { signOutAction } from '@/lib/actions';
 import { PushManager } from '@/components/PushManager';
-import { SoundToggle, ThemePicker, TimezoneSync } from '@/components/SettingsControls';
+import {
+  SoundToggle,
+  ThemePicker,
+  TimezoneSync,
+  WeeklyEmailToggle,
+} from '@/components/SettingsControls';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -29,6 +34,14 @@ export default async function SettingsPage() {
           Firm, on-time nudges for routines with a reminder time set.
         </p>
         <PushManager />
+      </section>
+
+      <section className="rounded-card bg-card p-6">
+        <h2 className="text-lg font-semibold">Weekly email</h2>
+        <p className="mb-4 mt-1 text-sm text-ink-soft">
+          A short Sunday summary of your week — what got done, your streaks.
+        </p>
+        <WeeklyEmailToggle initial={profile.weeklyEmail} />
       </section>
 
       <section className="rounded-card bg-card p-6">

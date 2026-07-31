@@ -12,6 +12,7 @@ import {
   applyCompletion,
   initialStreakState,
   reconcile,
+  MILESTONES,
   REST_DAYS_PER_MONTH,
 } from '@/core/streak';
 import { todayInTz } from '@/core/dates';
@@ -37,6 +38,7 @@ export async function createRoutineAction(input: {
   color: 'sky' | 'mint' | 'blush' | 'butter' | null;
   scheduleDays: number[];
   reminderTime: string | null;
+  reminderTimeWeekend: string | null;
   timerSeconds: number | null;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const { supabase, user } = await requireUser();
@@ -63,6 +65,7 @@ export async function updateRoutineAction(
     color?: 'sky' | 'mint' | 'blush' | 'butter' | null;
     scheduleDays?: number[];
     reminderTime?: string | null;
+    reminderTimeWeekend?: string | null;
     timerSeconds?: number | null;
   },
 ) {
@@ -121,6 +124,8 @@ export interface CompletionCelebration {
   bestStreak: number;
   freezeEarned: boolean;
   freezeBalance: number;
+  /** Set when this completion lands exactly on a milestone (7/30/100). */
+  milestone: number | null;
 }
 
 /** Called when the user finishes the last step of a run. */
@@ -147,6 +152,9 @@ export async function completeRoutineAction(routineId: string): Promise<Completi
     bestStreak: state.bestStreak,
     freezeEarned: events.some((e) => e.kind === 'earned'),
     freezeBalance: state.freezeBalance,
+    milestone: (MILESTONES as readonly number[]).includes(state.currentStreak)
+      ? state.currentStreak
+      : null,
   };
 }
 
@@ -243,6 +251,12 @@ export async function updateTimezoneAction(timezone: string) {
     return;
   }
   await db.updateProfile(supabase, user.id, { timezone });
+}
+
+export async function updateWeeklyEmailAction(enabled: boolean) {
+  const { supabase, user } = await requireUser();
+  await db.updateProfile(supabase, user.id, { weeklyEmail: enabled });
+  revalidatePath('/app/settings');
 }
 
 export async function updateThemeAction(theme: string) {

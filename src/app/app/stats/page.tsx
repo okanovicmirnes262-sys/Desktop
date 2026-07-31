@@ -7,6 +7,12 @@ import { completionRate, heatmapData } from '@/core/stats';
 import { canUseFeature } from '@/core/entitlements';
 import { Heatmap } from '@/components/Heatmap';
 
+const BADGES = [
+  { at: 7, emoji: '🥉', label: '7-day streak' },
+  { at: 30, emoji: '🥈', label: '30-day streak' },
+  { at: 100, emoji: '🏆', label: '100-day streak' },
+];
+
 // Stats, deliberately small: streaks for everyone; rate + heatmap are
 // premium ("full stats"). All gating flows through canUseFeature/hasPremium.
 export default async function StatsPage() {
@@ -78,6 +84,21 @@ export default async function StatsPage() {
               <p className="text-xs font-medium text-ink/70">30-day rate</p>
             </div>
           </div>
+
+          {/* Milestone badges — earned once via best streak, kept forever. */}
+          {streak && streak.bestStreak >= BADGES[0].at && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {BADGES.filter((b) => streak.bestStreak >= b.at).map((b) => (
+                <span
+                  key={b.at}
+                  className="rounded-full bg-paper px-3 py-1 text-sm font-medium"
+                  title={b.label}
+                >
+                  {b.emoji} {b.label}
+                </span>
+              ))}
+            </div>
+          )}
 
           {streak && streak.freezeBalance > 0 && (
             <p className="mt-3 text-sm text-ink-soft">

@@ -28,6 +28,9 @@ function mapRoutine(r: any): Routine {
     position: r.position,
     scheduleDays: r.schedule_days,
     reminderTime: r.reminder_time ? String(r.reminder_time).slice(0, 5) : null,
+    reminderTimeWeekend: r.reminder_time_weekend
+      ? String(r.reminder_time_weekend).slice(0, 5)
+      : null,
     timerSeconds: r.timer_seconds,
     isArchived: r.is_archived,
   };
@@ -69,13 +72,14 @@ export async function getProfile(db: Db, userId: string): Promise<Profile> {
     timezone: data.timezone,
     theme: data.theme,
     onboarded: data.onboarded,
+    weeklyEmail: data.weekly_email ?? true,
   };
 }
 
 export async function updateProfile(
   db: Db,
   userId: string,
-  patch: Partial<Pick<Profile, 'displayName' | 'timezone' | 'theme' | 'onboarded'>>,
+  patch: Partial<Pick<Profile, 'displayName' | 'timezone' | 'theme' | 'onboarded' | 'weeklyEmail'>>,
 ) {
   const { error } = await db
     .from('profiles')
@@ -84,6 +88,7 @@ export async function updateProfile(
       ...(patch.timezone !== undefined && { timezone: patch.timezone }),
       ...(patch.theme !== undefined && { theme: patch.theme }),
       ...(patch.onboarded !== undefined && { onboarded: patch.onboarded }),
+      ...(patch.weeklyEmail !== undefined && { weekly_email: patch.weeklyEmail }),
     })
     .eq('id', userId);
   fail(error);
@@ -118,6 +123,7 @@ export async function createRoutine(
     color?: Routine['color'];
     scheduleDays?: number[];
     reminderTime?: string | null;
+    reminderTimeWeekend?: string | null;
     timerSeconds?: number | null;
     position?: number;
   },
@@ -131,6 +137,7 @@ export async function createRoutine(
       color: input.color ?? null,
       schedule_days: input.scheduleDays ?? [0, 1, 2, 3, 4, 5, 6],
       reminder_time: input.reminderTime ?? null,
+      reminder_time_weekend: input.reminderTimeWeekend ?? null,
       timer_seconds: input.timerSeconds ?? null,
       position: input.position ?? 0,
     })
@@ -145,7 +152,7 @@ export async function createRoutine(
 export async function updateRoutine(
   db: Db,
   routineId: string,
-  patch: Partial<Pick<Routine, 'name' | 'emoji' | 'color' | 'scheduleDays' | 'reminderTime' | 'timerSeconds' | 'position' | 'isArchived'>>,
+  patch: Partial<Pick<Routine, 'name' | 'emoji' | 'color' | 'scheduleDays' | 'reminderTime' | 'reminderTimeWeekend' | 'timerSeconds' | 'position' | 'isArchived'>>,
 ) {
   const { error } = await db
     .from('routines')
@@ -155,6 +162,9 @@ export async function updateRoutine(
       ...(patch.color !== undefined && { color: patch.color }),
       ...(patch.scheduleDays !== undefined && { schedule_days: patch.scheduleDays }),
       ...(patch.reminderTime !== undefined && { reminder_time: patch.reminderTime }),
+      ...(patch.reminderTimeWeekend !== undefined && {
+        reminder_time_weekend: patch.reminderTimeWeekend,
+      }),
       ...(patch.timerSeconds !== undefined && { timer_seconds: patch.timerSeconds }),
       ...(patch.position !== undefined && { position: patch.position }),
       ...(patch.isArchived !== undefined && { is_archived: patch.isArchived }),

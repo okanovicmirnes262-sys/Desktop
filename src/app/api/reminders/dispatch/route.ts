@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const db = createAdminClient();
   const { data: routines, error } = await db
     .from('routines')
-    .select('id, user_id, name, reminder_time, schedule_days, profiles!inner(timezone)')
+    .select('id, user_id, name, reminder_time, reminder_time_weekend, schedule_days, profiles!inner(timezone)')
     .eq('is_archived', false)
     .not('reminder_time', 'is', null);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -32,9 +32,14 @@ export async function GET(request: Request) {
   for (const r of routines ?? []) {
     const tz = (r.profiles as unknown as { timezone: string }).timezone;
     const today = todayInTz(tz);
-    if (!(r.schedule_days as number[]).includes(weekdayOf(today))) continue;
+    const weekday = weekdayOf(today);
+    if (!(r.schedule_days as number[]).includes(weekday)) continue;
 
-    const reminderMin = minutesOfDay(String(r.reminder_time).slice(0, 5));
+    // Weekend override: Sat/Sun can have their own reminder time.
+    const isWeekend = weekday === 0 || weekday === 6;
+    const effectiveTime =
+      isWeekend && r.reminder_time_weekend ? r.reminder_time_weekend : r.reminder_time;
+    const reminderMin = minutesOfDay(String(effectiveTime).slice(0, 5));
     const nowMin = minutesOfDay(timeInTz(tz));
     if (nowMin < reminderMin || nowMin > reminderMin + CATCH_UP_MINUTES) continue;
 
@@ -68,7 +73,7 @@ export async function GET(request: Request) {
       .select('endpoint, p256dh, auth')
       .eq('user_id', r.user_id);
 
-    const copy = reminderCopy(r.name, String(r.reminder_time).slice(0, 5));
+    const copy = reminderCopy(r.name, String(effectiveTime).slice(0, 5));
     for (const target of targets ?? []) {
       const alive = await sendPush(target, copy).catch(() => true); // transient errors: keep sub
       if (!alive) {

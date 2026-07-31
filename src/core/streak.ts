@@ -27,6 +27,9 @@ export const MAX_FREEZES = 3;
 export const COMPLETIONS_PER_FREEZE = 7;
 export const REST_DAYS_PER_MONTH = 2;
 
+/** Streak lengths that get an extra-special celebration + a badge. */
+export const MILESTONES = [7, 30, 100] as const;
+
 export interface FreezeEvent {
   kind: 'earned' | 'consumed';
   /** The date the freeze covered (consumed) or was earned on. */

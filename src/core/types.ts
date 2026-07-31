@@ -16,6 +16,8 @@ export interface Profile {
   timezone: string;
   theme: string;
   onboarded: boolean;
+  /** Weekly summary email opt-in. */
+  weeklyEmail: boolean;
 }
 
 export type RoutineColor = 'sky' | 'mint' | 'blush' | 'butter';
@@ -32,6 +34,8 @@ export interface Routine {
   scheduleDays: number[];
   /** "HH:MM" user-local wall-clock time, or null when reminders are off. */
   reminderTime: string | null;
+  /** Weekend (Sat/Sun) override for the reminder; null = same as weekdays. */
+  reminderTimeWeekend: string | null;
   /** Optional whole-routine timer. */
   timerSeconds: number | null;
   isArchived: boolean;
